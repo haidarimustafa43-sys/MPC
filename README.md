@@ -46,11 +46,19 @@ npm run preview    # serve the production build
 
 ## Publishing on GitHub Pages
 
-1. Push the repository to GitHub (branch `main`).
+Every push to `main` and every pull request runs `.github/workflows/deploy.yml` as CI:
+`npm ci` → type check → lint → tests → build. **Publishing is manual**, so nothing goes
+live by accident:
+
+1. Push the repository to GitHub (branch `main`). On the free GitHub plan the repository
+   must be public for Pages.
 2. In the repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Every push to `main` runs `.github/workflows/deploy.yml`: `npm ci` → type check → tests →
-   build → deploy `dist/` to Pages.
+3. **Actions → CI and GitHub Pages → Run workflow** (branch `main`). This run also uploads
+   `dist/` and deploys it.
 4. Open `https://<user>.github.io/<repository>/`.
+
+To deploy automatically on every push instead, remove the two
+`if: github.event_name == 'workflow_dispatch'` lines in the workflow.
 
 Base path: `vite.config.ts` uses a **relative base (`./`)**, so the same build works locally,
 on a user page (`user.github.io`) and in a project repository (`user.github.io/MPC/`) without

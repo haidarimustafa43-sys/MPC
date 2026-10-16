@@ -1,8 +1,14 @@
-name: Deploy to GitHub Pages
+name: CI and GitHub Pages
+
+# Every push and pull request is checked (type check, lint, tests, build).
+# Publishing is manual on purpose: the site goes live only when someone runs
+# this workflow from the Actions tab ("Run workflow"), which needs Pages enabled
+# under Settings → Pages → Source: GitHub Actions.
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -11,7 +17,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -25,13 +31,16 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm run test
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      - if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-latest
     environment:
