@@ -1,0 +1,23 @@
+[
+  {
+    "id": "WC100",
+    "name": "Machining",
+    "normalCapacityHoursByPeriod": [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40],
+    "overtimeCapacityLimitHours": 10,
+    "overtimeCostPerHour": 450
+  },
+  {
+    "id": "WC200",
+    "name": "Sub-assembly",
+    "normalCapacityHoursByPeriod": [35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35],
+    "overtimeCapacityLimitHours": 8,
+    "overtimeCostPerHour": 500
+  },
+  {
+    "id": "WC300",
+    "name": "Final assembly",
+    "normalCapacityHoursByPeriod": [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40],
+    "overtimeCapacityLimitHours": 10,
+    "overtimeCostPerHour": 400
+  }
+]

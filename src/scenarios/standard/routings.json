@@ -1,0 +1,8 @@
+[
+  { "itemId": "A", "sequence": 10, "workCenterId": "WC300", "setupHours": 2, "runHoursPerUnit": 0.15 },
+  { "itemId": "B", "sequence": 10, "workCenterId": "WC300", "setupHours": 2, "runHoursPerUnit": 0.18 },
+  { "itemId": "C1", "sequence": 10, "workCenterId": "WC100", "setupHours": 3, "runHoursPerUnit": 0.06 },
+  { "itemId": "C1", "sequence": 20, "workCenterId": "WC200", "setupHours": 1, "runHoursPerUnit": 0.03 },
+  { "itemId": "C2", "sequence": 10, "workCenterId": "WC200", "setupHours": 2, "runHoursPerUnit": 0.2 },
+  { "itemId": "C3", "sequence": 10, "workCenterId": "WC100", "setupHours": 2, "runHoursPerUnit": 0.04 }
+]

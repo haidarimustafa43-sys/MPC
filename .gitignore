@@ -1,0 +1,13 @@
+node_modules
+dist
+*.local
+.vite
+coverage
+*.tsbuildinfo
+.DS_Store
+
+# Old prototype kept locally for reference only
+OldCodeForInspirationForMRP/
+
+# Personal editor settings
+.vscode/

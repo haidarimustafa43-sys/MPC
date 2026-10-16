@@ -1,0 +1,12 @@
+[
+  { "parentItemId": "A", "componentItemId": "C1", "quantityPer": 1 },
+  { "parentItemId": "A", "componentItemId": "C2", "quantityPer": 1 },
+  { "parentItemId": "A", "componentItemId": "RM3", "quantityPer": 2 },
+  { "parentItemId": "B", "componentItemId": "C1", "quantityPer": 1 },
+  { "parentItemId": "B", "componentItemId": "C3", "quantityPer": 1 },
+  { "parentItemId": "B", "componentItemId": "RM3", "quantityPer": 4 },
+  { "parentItemId": "C1", "componentItemId": "RM1", "quantityPer": 2, "scrapRate": 0.05 },
+  { "parentItemId": "C2", "componentItemId": "RM2", "quantityPer": 1 },
+  { "parentItemId": "C2", "componentItemId": "C3", "quantityPer": 1 },
+  { "parentItemId": "C3", "componentItemId": "RM4", "quantityPer": 0.5 }
+]

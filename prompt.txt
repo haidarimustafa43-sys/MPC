@@ -1,0 +1,1696 @@
+DU ÄR
+
+Du är en senior fullstackutvecklare, systemarkitekt, UX-designer och specialist på produktionsplanering. Du har särskild kompetens inom:
+
+- Master Production Scheduling, MPS
+- Material Requirements Planning, MRP
+- Capacity Requirements Planning, CRP
+- Rough-Cut Capacity Planning, RCCP
+- Available-to-Promise, ATP
+- stycklistor, BOM
+- operationslistor och arbetsstationer
+- lagerstyrning
+- produktionsorder
+- inköpsorder
+- partiformningsmetoder
+- händelsedrivna simuleringsspel
+- pedagogiska webbapplikationer
+- React
+- TypeScript
+- Vite
+- GitHub Pages
+- testbar och modulär programvaruarkitektur
+
+(allt innehåll på websidan ska vara på engelska) 
+Du ska implementera en komplett, fungerande och backend-fri webbapplikation för undervisning i produktionsplanering.
+
+Skapa inte bara mockups, skärmbilder eller ett statiskt gränssnitt. Applikationen ska ha en fungerande planeringsmotor, händelsemotor, tillståndshantering, lokal lagring och ett spelbart veckoflöde.
+
+--------------------------------------------------
+1. PROJEKTETS SYFTE
+--------------------------------------------------
+
+Bygg ett webbaserat utbildningsspel för universitetskurser inom produktionsstyrning, materialplanering och operations management.
+
+Systemet ska fungera som ett förenklat pedagogiskt MPS/MRP-system med vissa likheter med ett ERP-system, men det ska vara betydligt tydligare och mer förklarande än ett kommersiellt affärssystem.
+
+Spelets viktigaste pedagogiska syfte är att studenten ska förstå att en plan inte är statisk.
+
+När en oväntad händelse inträffar ska studenten behöva:
+
+1. ta emot ny information,
+2. analysera hur planeringsförutsättningarna har förändrats,
+3. identifiera konsekvenser i MPS, MRP, lager och kapacitet,
+4. ändra ett eller flera planeringsbeslut,
+5. köra om beräkningarna,
+6. jämföra den nya planen med föregående plan,
+7. hantera eventuella nya problem,
+8. fastställa planen,
+9. simulera veckans verkliga utfall,
+10. gå vidare till nästa vecka.
+
+Spelets centrala loop ska vara:
+
+INFORMATION
+→ ANALYS
+→ PLANERING
+→ BERÄKNING
+→ PROBLEMIDENTIFIERING
+→ OMPLANERING
+→ FASTSTÄLLANDE
+→ SIMULERING
+→ UTFALL
+→ NY INFORMATION
+
+Systemet ska inte automatiskt lösa problemen åt studenten.
+
+--------------------------------------------------
+2. VIKTIGA BEGRÄNSNINGAR
+--------------------------------------------------
+
+Applikationen ska:
+
+- kunna publiceras som en statisk webbplats på GitHub Pages,
+- fungera utan egen backend,
+- fungera utan databas,
+- fungera utan användarkonton,
+- inte kräva någon API-nyckel,
+- inte kräva betalda externa tjänster,
+- inte skicka studentdata till en server,
+- lagra spelstatus lokalt i webbläsaren,
+- kunna exportera och importera spelstatus som en fil,
+- vara responsiv men främst optimerad för laptop och desktop,
+- kunna köras lokalt med npm,
+- kunna byggas med npm run build,
+- kunna publiceras automatiskt via GitHub Actions.
+
+All kärnlogik ska köras i studentens webbläsare.
+
+Använd inte:
+
+- Node.js-server,
+- Express,
+- PHP,
+- Python-backend,
+- server-side rendering,
+- SQL-databas,
+- Firebase,
+- Supabase,
+- autentiseringstjänst,
+- externa AI-API:er,
+- externa kommersiella API:er.
+
+Om en funktion normalt skulle kräva backend ska den ersättas med en backend-fri lösning, till exempel:
+
+- localStorage,
+- IndexedDB,
+- JSON-filer,
+- export/import,
+- nedladdningsbara resultatfiler.
+
+--------------------------------------------------
+3. REKOMMENDERAD TEKNIK
+--------------------------------------------------
+
+Använd följande teknik om det inte finns ett mycket starkt tekniskt skäl att välja något annat:
+
+- React
+- TypeScript
+- Vite
+- React Router med GitHub Pages-kompatibel routing
+- Zustand eller React Context + useReducer för applikationstillstånd
+- IndexedDB via idb-biblioteket för beständig lagring
+- localStorage endast för små inställningar, till exempel tema och aktivt spel-ID
+- Recharts för diagram
+- Lucide React för ikoner
+- CSS Modules, vanlig CSS eller Tailwind CSS
+- Vitest för enhetstester
+- React Testing Library för viktiga UI-flöden
+- ESLint
+- Prettier
+
+Använd antingen HashRouter eller en annan dokumenterad lösning som gör att direkt navigation och omladdning fungerar på GitHub Pages.
+
+Konfigurera Vite base-path korrekt så att webbplatsen fungerar både:
+
+- lokalt,
+- på en användarsida,
+- i ett projekt-repository på GitHub Pages.
+
+Repository-namnet ska enkelt kunna ändras utan att hårdkodas på många ställen.
+
+--------------------------------------------------
+4. LEVERANSKRAV
+--------------------------------------------------
+
+Leverera ett komplett repository.
+
+Det ska minst innehålla:
+
+- package.json
+- vite.config.ts
+- tsconfig.json
+- index.html
+- src/
+- public/
+- tester
+- README.md
+- GitHub Actions-workflow för GitHub Pages
+- exempeldata
+- minst ett spelbart scenario
+- import/export
+- instruktioner för lokal körning
+- instruktioner för GitHub Pages-publicering
+
+Skapa inte pseudokod när fungerande kod kan skrivas.
+
+Lämna inte centrala funktioner som TODO.
+
+Om projektet är för omfattande för en enda implementation, bygg först en komplett vertikal MVP där hela spelflödet fungerar med ett mindre dataset. Utöka sedan modul för modul.
+
+En vertikal MVP är bättre än många halvfärdiga sidor.
+
+--------------------------------------------------
+5. ARKITEKTUR
+--------------------------------------------------
+
+Separera följande delar tydligt:
+
+A. Presentation
+B. Domänmodeller
+C. Planeringsmotor
+D. Händelsemotor
+E. Spelmotor
+F. Validering och constraints
+G. Lagring
+H. Scenario- och masterdata
+I. Import/export
+J. Tester
+
+Föreslagen struktur:
+
+src/
+  app/
+    App.tsx
+    router.tsx
+    providers.tsx
+
+  components/
+    layout/
+    common/
+    tables/
+    charts/
+    dialogs/
+    planning/
+    inbox/
+
+  pages/
+    StartPage.tsx
+    DashboardPage.tsx
+    InboxPage.tsx
+    MasterDataPage.tsx
+    MpsPage.tsx
+    MrpPage.tsx
+    CapacityPage.tsx
+    InventoryPage.tsx
+    OrdersPage.tsx
+    PlanningVersionsPage.tsx
+    ReportsPage.tsx
+    InstructorReviewPage.tsx
+    SettingsPage.tsx
+
+  domain/
+    item.ts
+    bom.ts
+    routing.ts
+    workCenter.ts
+    inventory.ts
+    demand.ts
+    order.ts
+    supplier.ts
+    event.ts
+    scenario.ts
+    gameState.ts
+    planningVersion.ts
+    constraint.ts
+    kpi.ts
+
+  engine/
+    mps/
+      calculateMps.ts
+      calculateAtp.ts
+    mrp/
+      explodeBom.ts
+      calculateMrp.ts
+      lotSizing.ts
+      timePhaseOrders.ts
+    capacity/
+      calculateRccp.ts
+      calculateCrp.ts
+    inventory/
+      projectInventory.ts
+    events/
+      evaluateEventTriggers.ts
+      applyEventEffects.ts
+    simulation/
+      simulateWeek.ts
+      receiveOrders.ts
+      completeProduction.ts
+      fulfillCustomerOrders.ts
+    constraints/
+      evaluateConstraints.ts
+    scoring/
+      calculateKpis.ts
+      calculateScore.ts
+
+  state/
+    gameStore.ts
+    selectors.ts
+    actions.ts
+
+  storage/
+    database.ts
+    saveRepository.ts
+    migrations.ts
+
+  importExport/
+    exportGame.ts
+    importGame.ts
+    validateSaveFile.ts
+
+  scenarios/
+    standard/
+      scenario.json
+      items.json
+      bom.json
+      routings.json
+      workCenters.json
+      suppliers.json
+      forecasts.json
+      customerOrders.json
+      events.json
+
+  utils/
+  tests/
+  styles/
+
+Undvik cirkulära beroenden.
+
+Beräkningsmotorerna ska vara rena TypeScript-funktioner så långt det är möjligt. De ska inte bero på React eller direkt läsa från webbläsarens lagring.
+
+Exempel:
+
+calculateMrp(input): MrpResult
+
+inte:
+
+calculateMrp() {
+  const state = window.localStorage...
+}
+
+--------------------------------------------------
+6. DOMÄNMODELL
+--------------------------------------------------
+
+Skapa tydliga TypeScript-typer och använd inte any.
+
+Minst följande typer behövs.
+
+ITEM
+
+interface Item {
+  id: string;
+  name: string;
+  description?: string;
+  type: "END_ITEM" | "MANUFACTURED" | "PURCHASED";
+  unit: string;
+  leadTimePeriods: number;
+  safetyLeadTimePeriods: number;
+  safetyStock: number;
+  initialInventory: number;
+  lotSizingPolicy: LotSizingPolicy;
+  holdingCostPerUnitPeriod: number;
+  orderCost: number;
+  standardCost: number;
+  sellingPrice?: number;
+  defaultWarehouseId: string;
+  active: boolean;
+}
+
+BOM
+
+interface BomLine {
+  parentItemId: string;
+  componentItemId: string;
+  quantityPer: number;
+  scrapRate?: number;
+  effectiveFromPeriod?: number;
+  effectiveToPeriod?: number;
+}
+
+ROUTING
+
+interface RoutingOperation {
+  itemId: string;
+  sequence: number;
+  workCenterId: string;
+  setupHours: number;
+  runHoursPerUnit: number;
+  yieldRate?: number;
+}
+
+WORK CENTER
+
+interface WorkCenter {
+  id: string;
+  name: string;
+  normalCapacityHoursByPeriod: number[];
+  overtimeCapacityLimitHours?: number;
+  overtimeCostPerHour?: number;
+}
+
+WAREHOUSE
+
+interface Warehouse {
+  id: string;
+  name: string;
+  type: "RAW_MATERIAL" | "WIP" | "FINISHED_GOODS";
+}
+
+SUPPLIER
+
+interface Supplier {
+  id: string;
+  name: string;
+  suppliedItemIds: string[];
+  normalLeadTimePeriods: number;
+  unitCostModifiers?: Record<string, number>;
+  reliability?: number;
+  active: boolean;
+}
+
+CUSTOMER ORDER
+
+interface CustomerOrder {
+  id: string;
+  customerName: string;
+  itemId: string;
+  quantity: number;
+  duePeriod: number;
+  sellingPricePerUnit: number;
+  status:
+    | "PROPOSED"
+    | "ACCEPTED"
+    | "REJECTED"
+    | "PARTIALLY_FULFILLED"
+    | "FULFILLED"
+    | "LATE";
+  acceptedAtPeriod?: number;
+}
+
+INVENTORY
+
+Lager ska kunna särskiljas per artikel och lagerställe.
+
+interface InventoryBalance {
+  itemId: string;
+  warehouseId: string;
+  quantityOnHand: number;
+  allocatedQuantity: number;
+}
+
+ORDER
+
+Skilj mellan:
+
+- planerad produktionsorder,
+- frisläppt produktionsorder,
+- pågående produktionsorder,
+- färdig produktionsorder,
+- planerad inköpsorder,
+- frisläppt inköpsorder,
+- mottagen inköpsorder.
+
+LotSizingPolicy ska minst stödja:
+
+- LFL
+- FOQ
+- POQ
+- EOQ
+- FPR
+- MULTIPLE
+
+Designa policyerna som en discriminated union och inkludera de parametrar respektive metod behöver.
+
+--------------------------------------------------
+7. GAME STATE
+--------------------------------------------------
+
+Allt som beskriver en aktiv spelomgång ska samlas i GameState.
+
+GameState ska minst innehålla:
+
+- saveFileVersion
+- applicationVersion
+- gameId
+- teamName
+- scenarioId
+- scenarioVersion
+- randomSeed
+- currentPeriod
+- gameStatus
+- inventory
+- forecast
+- customerOrders
+- plannedOrders
+- releasedOrders
+- suppliers
+- workCenterCapacity
+- activeEventEffects
+- inboxMessages
+- eventHistory
+- decisions
+- planningVersions
+- committedPlanVersionId
+- completedPeriods
+- kpiHistory
+- financialHistory
+- settings
+
+GameState ska inte lagra onödigt duplicerade beräkningsresultat om dessa säkert kan räknas om.
+
+Resultat som är historiskt viktiga ska dock sparas som snapshots, exempelvis en fastställd plan för en avslutad vecka.
+
+--------------------------------------------------
+8. GRUNDSCENARIO
+--------------------------------------------------
+
+Skapa ett mindre men sammanhängande demonstrationsscenario.
+
+Det ska åtminstone innehålla:
+
+- två slutprodukter: A och B,
+- flera egentillverkade komponenter,
+- minst tre inköpta råmaterial,
+- minst tre arbetsstationer,
+- flernivå-BOM,
+- operationer med ställtid och stycktid,
+- prognos över minst 12 perioder,
+- kundorder,
+- initiallager,
+- öppna produktionsorder,
+- öppna inköpsorder,
+- minst två leverantörer för ett kritiskt råmaterial,
+- flera händelser,
+- kostnadsdata.
+
+Använd generiska företag och personer:
+
+- Customer Alpha
+- Customer Beta
+- Supplier North
+- Supplier Central
+- Production Manager
+- Warehouse
+- Quality Department
+
+Skriv all exempeldata i JSON. Lägg inte scenariodata direkt i React-komponenter.
+
+--------------------------------------------------
+9. PLANERINGSMOTOR
+--------------------------------------------------
+
+Implementera följande korrekt och testbart.
+
+A. MPS
+
+För slutprodukter ska systemet visa per period:
+
+- forecast,
+- customer orders,
+- total demand,
+- scheduled receipts,
+- projected available balance,
+- MPS receipt,
+- MPS release,
+- ATP,
+- brist eller riskindikator.
+
+Definiera tydligt hur prognos och kundorder konsumerar varandra.
+
+Dokumentera vald regel i README.
+
+B. MRP
+
+För varje relevant artikel ska systemet visa:
+
+- gross requirements,
+- scheduled receipts,
+- projected available balance,
+- net requirements,
+- planned order receipts,
+- planned order releases,
+- safety stock,
+- lead time,
+- lot-sizing policy,
+- shortage indicator.
+
+BOM-explosionen ska:
+
+- stödja flera nivåer,
+- använda quantityPer,
+- hantera scrapRate om angivet,
+- skapa komponentbehov baserat på förälderns planerade orderstarter,
+- undvika oändliga loopar,
+- upptäcka cykliska stycklistor och rapportera datavalideringsfel.
+
+C. LOT SIZING
+
+Implementera separata rena funktioner för:
+
+- LFL,
+- FOQ,
+- POQ,
+- FPR,
+- MULTIPLE,
+- EOQ om tillräcklig kostnadsdata finns.
+
+Tydliggör antaganden för EOQ och POQ.
+
+D. ATP
+
+ATP ska visas för slutprodukter där det är relevant.
+
+E. CRP
+
+Beräkna kapacitetsbehov per:
+
+- arbetsstation,
+- period,
+- order,
+- operation.
+
+Använd:
+
+capacity load =
+setup time per order
++ order quantity × run time per unit
+
+CRP ska visa:
+
+- normal kapacitet,
+- eventuell övertidskapacitet,
+- totalt behov,
+- över- eller underkapacitet,
+- kapacitetsutnyttjande,
+- bidragande produktionsorder.
+
+F. RCCP
+
+MVP:n kan ha en förenklad RCCP för slutprodukternas kritiska resurser.
+
+RCCP ska hållas åtskild från detaljerad CRP.
+
+--------------------------------------------------
+10. CONSTRAINT ENGINE
+--------------------------------------------------
+
+Implementera en central motor som identifierar problem utan att automatiskt lösa dem.
+
+Constraint-typer ska minst omfatta:
+
+- projected inventory below zero,
+- projected inventory below safety stock,
+- missing material,
+- late planned release,
+- past-due order,
+- work-center overload,
+- customer order at risk,
+- customer order late,
+- supplier unavailable,
+- invalid BOM,
+- missing routing,
+- plan not recalculated after decision,
+- frozen-zone violation,
+- uncommitted planning changes.
+
+Varje constraint ska innehålla:
+
+interface ConstraintViolation {
+  id: string;
+  type: string;
+  severity: "INFO" | "WARNING" | "CRITICAL" | "BLOCKING";
+  title: string;
+  description: string;
+  period?: number;
+  itemId?: string;
+  workCenterId?: string;
+  relatedOrderIds?: string[];
+  source: "MPS" | "MRP" | "CRP" | "INVENTORY" | "EVENT" | "DATA";
+}
+
+Visa problemen för studenten, men ge inte automatiskt exakt facit.
+
+Ett meddelande får exempelvis säga:
+
+"WC200 är överbelastad med 14 timmar i vecka 7."
+
+Det ska normalt inte säga:
+
+"Flytta order PO-104 till vecka 6."
+
+Systemet kan däremot visa vilka order som bidrar till belastningen.
+
+--------------------------------------------------
+11. BESLUT STUDENTEN KAN FATTA
+--------------------------------------------------
+
+Studenten ska minst kunna:
+
+- ändra prognos där scenariot tillåter det,
+- acceptera eller avböja en ny kundorder,
+- ändra säkerhetslager,
+- ändra säkerhetsledtid,
+- ändra partiformningsmetod,
+- ändra parameter för FOQ, POQ, FPR eller MULTIPLE,
+- ändra planerad orderkvantitet,
+- tidigarelägga en planerad order,
+- senarelägga en planerad order,
+- frisläppa en produktionsorder,
+- frisläppa en inköpsorder,
+- välja leverantör,
+- köpa expressleverans om scenariot erbjuder det,
+- lägga till övertid inom tillåten gräns,
+- använda extern kapacitet om scenariot erbjuder det,
+- avbryta ett ännu inte frisläppt beslut,
+- återställa arbetsversionen till senast fastställda plan.
+
+Alla beslut ska loggas.
+
+interface DecisionRecord {
+  id: string;
+  period: number;
+  iteration: number;
+  timestamp: string;
+  category: string;
+  entityType: string;
+  entityId?: string;
+  field?: string;
+  previousValue?: unknown;
+  newValue?: unknown;
+  reason?: string;
+}
+
+Ge studenten möjlighet att skriva en kort motivering till större beslut.
+
+--------------------------------------------------
+12. PLANERINGSVERSIONER OCH OMPLANERING
+--------------------------------------------------
+
+Omplanering är applikationens viktigaste funktion.
+
+Studenten ska kunna arbeta iterativt inom samma vecka.
+
+Exempel:
+
+- Vecka 6, planversion 1
+- Vecka 6, planversion 2
+- Vecka 6, planversion 3
+
+Varje gång studenten väljer "Kör planering" ska systemet:
+
+1. läsa aktuell arbetsversion,
+2. köra MPS,
+3. köra MRP,
+4. köra CRP,
+5. evaluera constraints,
+6. beräkna förväntade KPI:er,
+7. skapa en immutable PlanningVersion,
+8. visa skillnader mot föregående version.
+
+interface PlanningVersion {
+  id: string;
+  period: number;
+  iteration: number;
+  createdAt: string;
+  decisionIds: string[];
+  inputSnapshot: PlanningInputSnapshot;
+  mpsResult: MpsResult;
+  mrpResult: MrpResult;
+  crpResult: CrpResult;
+  violations: ConstraintViolation[];
+  projectedKpis: KpiResult;
+}
+
+Implementera en jämförelsevy som visar exempelvis:
+
+PLAN V1 → PLAN V2
+
+- överbelastning WC200: 14 h → 4 h
+- prognostiserad materialbrist RM2: 80 st → 0 st
+- lagerkostnad: 12 400 kr → 18 100 kr
+- övertidskostnad: 0 kr → 3 200 kr
+- order med leveransrisk: 3 → 1
+
+Markera förbättring och försämring, men var försiktig med att anta att en viss KPI alltid är viktigast.
+
+Studenten ska kunna välja en planeringsversion och fastställa den som veckans plan.
+
+--------------------------------------------------
+13. HÄNDELSEMOTOR
+--------------------------------------------------
+
+Bygg en generell, datadriven händelsemotor.
+
+Händelser ska definieras i JSON, inte hårdkodas i UI-komponenter.
+
+En händelse ska kunna innehålla:
+
+- id,
+- name,
+- category,
+- trigger,
+- probability,
+- prerequisites,
+- message,
+- choices,
+- immediate effects,
+- delayed effects,
+- duration,
+- visibility rules,
+- whether acknowledgment is required,
+- whether a decision is required,
+- follow-up event IDs.
+
+Exempelstruktur:
+
+{
+  "id": "SUPPLIER-RM2-DELAY",
+  "name": "Delivery delay for RM2",
+  "category": "SUPPLIER",
+  "trigger": {
+    "type": "PERIOD_START",
+    "period": 6
+  },
+  "probability": 1,
+  "message": {
+    "sender": "Supplier North",
+    "severity": "CRITICAL",
+    "title": "Delayed delivery of RM2",
+    "body": "A production disruption means that the confirmed RM2 delivery will arrive two periods later than planned."
+  },
+  "acknowledgementRequired": true,
+  "effects": [
+    {
+      "type": "DELAY_PURCHASE_ORDER",
+      "purchaseOrderId": "PUR-RM2-002",
+      "periods": 2
+    }
+  ]
+}
+
+Händelsemotorn ska stödja:
+
+A. Tidsbaserade triggers
+
+- period start,
+- period end,
+- specifik period,
+- periodintervall.
+
+B. Tillståndsbaserade triggers
+
+Exempel:
+
+- inventory below threshold,
+- utilization above threshold,
+- service level above or below threshold,
+- repeated overtime,
+- specific decision taken,
+- customer order accepted,
+- supplier selected.
+
+C. Slumpbaserade triggers
+
+Använd en seedad slumpgenerator så att ett spel kan reproduceras.
+
+Spara randomSeed i GameState.
+
+Tillåt scenarioinställningar som:
+
+- fixed: alla grupper får samma händelser,
+- seeded: gruppen får ett reproducerbart händelseförlopp,
+- random: händelser varierar.
+
+D. Villkorade konsekvenser
+
+Samma händelse ska kunna ge olika konsekvenser beroende på studentens planering.
+
+Exempel:
+
+En leverantörsförsening kan leda till materialbrist för en grupp med lågt lager, men inte för en grupp som byggt säkerhetslager.
+
+Händelsemotorn ska därför ändra förutsättningarna. Den ska inte hårdkoda slutresultatet.
+
+--------------------------------------------------
+14. INBOX OCH POPUP-FÖNSTER
+--------------------------------------------------
+
+Studenten ska informeras om händelser genom ett meddelandesystem.
+
+Implementera:
+
+- popup/modal för nya kritiska händelser,
+- permanent Inbox,
+- olästmarkering,
+- meddelandebadge i navigationen,
+- avsändare,
+- tidpunkt eller spelperiod,
+- kategori,
+- allvarlighetsgrad,
+- meddelandetext,
+- relaterade objekt,
+- eventuella val,
+- status: unread, read, acknowledged, responded.
+
+Exempel på avsändare:
+
+- Supplier North
+- Customer Alpha
+- Production Manager
+- Warehouse
+- Quality Department
+- Finance Department
+
+Meddelandetyper:
+
+1. Information
+2. Warning
+3. Critical disruption
+4. Customer request
+5. Business opportunity
+6. Internal operational message
+7. System notification
+
+Kritiska händelser ska visas i popup när veckan börjar.
+
+Popupen ska aldrig vara den enda platsen där informationen finns. Meddelandet ska också sparas i Inbox.
+
+Exempel:
+
+LEVERANTÖRSMEDDELANDE
+
+Avsändare:
+Supplier North
+
+Rubrik:
+Delayed delivery of RM2
+
+Text:
+Due to a disruption at our production facility, your confirmed delivery scheduled for period 7 will not arrive before period 9.
+
+Knapp:
+Acknowledge
+
+Meddelandet ska inte beskriva exakt hur studenten ska lösa problemet.
+
+KUNDFÖRFRÅGAN
+
+Avsändare:
+Customer Alpha
+
+Rubrik:
+Request to increase order quantity
+
+Text:
+Customer Alpha requests an increase of Product A from 150 to 240 units while retaining the original delivery period.
+
+Val:
+- Accept
+- Reject
+- Review planning before deciding
+
+Om studenten väljer "Review planning before deciding" ska meddelandet ligga kvar som obesvarat. Studenten ska kunna göra en preliminär what-if-planering innan beslutet tas.
+
+--------------------------------------------------
+15. WHAT-IF-LÄGE
+--------------------------------------------------
+
+Implementera ett enkelt what-if-läge.
+
+Studenten ska kunna:
+
+1. skapa en tillfällig planeringsgren,
+2. acceptera exempelvis en extra kundorder i grenen,
+3. köra MPS/MRP/CRP,
+4. granska konsekvenser,
+5. antingen tillämpa grenen eller kasta den.
+
+What-if-resultatet får inte ändra den fastställda spelstatusen förrän studenten uttryckligen väljer "Tillämpa".
+
+Visa tydligt när studenten arbetar i:
+
+- LIVE PLAN,
+- WORKING PLAN,
+- WHAT-IF PLAN.
+
+--------------------------------------------------
+16. VECKOFLÖDE
+--------------------------------------------------
+
+Implementera en tydlig state machine.
+
+GameStatus kan exempelvis vara:
+
+- NOT_STARTED
+- PERIOD_START
+- EVENTS_PENDING
+- ANALYSIS
+- PLANNING_DIRTY
+- PLAN_CALCULATED
+- PLAN_COMMITTED
+- PERIOD_SIMULATED
+- PERIOD_REVIEW
+- GAME_COMPLETED
+
+Tillåt inte ogiltiga övergångar.
+
+Exempel:
+
+Studenten ska inte kunna simulera nästa vecka om:
+
+- en blockerande kundförfrågan är obesvarad,
+- ingen plan har beräknats,
+- den beräknade planen inte motsvarar senaste ändringen,
+- ingen planeringsversion har fastställts.
+
+Veckoflöde:
+
+1. Start week
+2. Applicera händelser
+3. Visa kritiska popupmeddelanden
+4. Studenten läser Inbox
+5. Studenten analyserar MPS/MRP/CRP
+6. Studenten ändrar planeringen
+7. Studenten kör planeringen
+8. Constraints och prognostiserade KPI:er visas
+9. Studenten kan omplanera flera gånger
+10. Studenten fastställer en plan
+11. Studenten simulerar veckan
+12. Systemet genomför verkliga flöden
+13. Veckans utfall visas
+14. Studenten går vidare
+
+--------------------------------------------------
+17. SIMULERING AV VERKLIGT UTFALL
+--------------------------------------------------
+
+När en plan fastställts och veckan simuleras ska systemet minst:
+
+- ta emot inköpsorder vars leveransperiod infaller,
+- genomföra produktionsorder som har material och kapacitet,
+- inte färdigställa order som saknar kritiskt material,
+- hantera partiell produktion endast om scenariot tillåter det,
+- förbruka komponenter,
+- placera färdigställda komponenter eller produkter i rätt lager,
+- leverera kundorder när lager finns,
+- markera sena kundorder,
+- uppdatera lagersaldo,
+- uppdatera orderstatus,
+- uppdatera kostnader,
+- uppdatera intäkter,
+- registrera faktisk servicegrad,
+- skapa ett immutable periodresultat.
+
+Skilj mellan:
+
+- planerat utfall,
+- realiserat utfall.
+
+Det ska synas om en plan misslyckades på grund av en händelse eller ett olöst planeringsproblem.
+
+--------------------------------------------------
+18. KPI OCH EKONOMI
+--------------------------------------------------
+
+MVP:n ska minst beräkna:
+
+- intäkter,
+- materialkostnad,
+- orderkostnad,
+- lagerhållningskostnad,
+- övertidskostnad,
+- eventuell expresskostnad,
+- eventuell kostnad för extern kapacitet,
+- kostnad för försenade order,
+- nettobidrag eller förenklat resultat,
+- servicegrad,
+- antal sena kundorder,
+- genomsnittligt lager,
+- antal kapacitetsöverbelastningar,
+- totalt antal omplaneringar.
+
+Dokumentera beräkningsregler i README.
+
+Undvik en enda poäng som döljer alla avvägningar.
+
+Visa både:
+
+- total score,
+- ingående KPI:er.
+
+Studenten ska kunna se att exempelvis högt säkerhetslager kan förbättra robustheten men öka lagerkostnaden.
+
+--------------------------------------------------
+19. ANVÄNDARGRÄNSSNITT
+--------------------------------------------------
+
+Gränssnittet ska kännas som ett modernt, förenklat planeringssystem.
+
+Det ska vara pedagogiskt, inte överlastat.
+
+Huvudnavigation:
+
+- Dashboard
+- Inbox
+- MPS
+- MRP
+- Capacity
+- Inventory
+- Orders
+- Planning versions
+- Reports
+- Settings
+
+DASHBOARD
+
+Visa:
+
+- aktuellt veckonummer,
+- status i veckoflödet,
+- olästa meddelanden,
+- kritiska planeringsproblem,
+- servicegrad,
+- resultat,
+- lagervärde,
+- total överbelastning,
+- order med leveransrisk,
+- senaste beslut,
+- primär nästa åtgärd.
+
+Exempel på primära knappar:
+
+- Read new messages
+- Run planning
+- Review constraints
+- Commit plan
+- Simulate week
+- Review period result
+- Start next week
+
+Visa bara den knapp som är relevant i aktuell fas, eller förklara varför en knapp är inaktiverad.
+
+MPS OCH MRP
+
+Använd tidsfasade tabeller med:
+
+- frysta kolumner för radnamn,
+- horisontell scroll,
+- färgkodning,
+- tooltips,
+- klickbara celler,
+- indikator för manuellt ändrade värden,
+- tydlig skillnad mellan input och beräknat värde.
+
+CAPACITY
+
+Visa:
+
+- diagram över behov och tillgänglig kapacitet,
+- tabell per arbetsstation och period,
+- röd markering vid överbelastning,
+- order som bidrar till belastningen,
+- övertidsinställning,
+- drill-down per operation.
+
+INVENTORY
+
+Visa:
+
+- lagersaldo per artikel och lagerställe,
+- prognostiserad lagerutveckling,
+- säkerhetslager,
+- allokering,
+- tillgängligt lager,
+- shortage risk.
+
+ORDERS
+
+Visa separata filter eller flikar för:
+
+- planned production,
+- released production,
+- purchase orders,
+- customer orders.
+
+--------------------------------------------------
+20. FÖRKLARINGSLÄGE
+--------------------------------------------------
+
+Systemet ska vara transparent.
+
+När studenten klickar på ett beräknat MRP-värde ska en panel kunna visa exempelvis:
+
+Net requirement for RM2, period 7
+
+Gross requirements: 250
+Scheduled receipts: 50
+Projected available before receipt: 80
+Safety stock: 40
+
+Calculated net requirement:
+250 + 40 - 80 - 50 = 160
+
+Lot-sizing method:
+FOQ, quantity 200
+
+Planned order receipt:
+200
+
+Lead time:
+2 periods
+
+Planned order release:
+Period 5
+
+Förklaringen ska genereras från den faktiska beräkningen, inte vara hårdkodad text.
+
+Beräkningsresultaten bör därför innehålla calculation trace eller motsvarande förklaringsdata.
+
+Exempel:
+
+interface CalculationTrace {
+  formula: string;
+  inputs: Record<string, number | string>;
+  intermediateValues?: Record<string, number>;
+  result: number;
+  explanationKey: string;
+}
+
+--------------------------------------------------
+21. SPARA, EXPORTERA OCH IMPORTERA
+--------------------------------------------------
+
+Använd IndexedDB för automatisk lokal lagring.
+
+Funktioner:
+
+- autosave,
+- manual save,
+- list saved games,
+- rename save,
+- duplicate save,
+- delete save,
+- reset scenario.
+
+Implementera export av hela spelomgången som en fil.
+
+Föreslagen filändelse:
+
+.mpcgame
+
+Tekniskt kan filen innehålla JSON.
+
+Den ska minst innehålla:
+
+- schemaVersion,
+- exportedAt,
+- applicationVersion,
+- scenarioId,
+- scenarioVersion,
+- checksum eller enkel integritetskontroll,
+- GameState.
+
+Implementera robust importvalidering.
+
+Import ska:
+
+- kontrollera schemaVersion,
+- kontrollera obligatoriska fält,
+- inte exekvera kod,
+- avvisa orimlig eller trasig data,
+- migrera äldre versioner om en migration finns,
+- visa begripliga felmeddelanden.
+
+Tillåt även export till JSON eller CSV av:
+
+- KPI-historik,
+- beslutshistorik,
+- orderhistorik,
+- lagerhistorik.
+
+--------------------------------------------------
+22. LÄRARGRANSKNING UTAN BACKEND
+--------------------------------------------------
+
+Skapa en lokal Instructor Review-sida.
+
+Läraren ska kunna importera en eller flera .mpcgame-filer manuellt och få en sammanställning.
+
+Ingen fil ska laddas upp till en server.
+
+Visa per importerad spelomgång:
+
+- teamnamn,
+- scenario,
+- slutperiod,
+- slutfört eller ej,
+- servicegrad,
+- resultat,
+- lagerkostnad,
+- övertidskostnad,
+- sena order,
+- antal omplaneringar,
+- större beslut,
+- händelser som inträffat,
+- planeringsversioner per period.
+
+Om möjligt ska flera importerade filer kunna jämföras lokalt i samma session.
+
+Presentera jämförelser av KPI:er, men generera inte automatiskt betyg och påstå inte att ett visst team presterat bäst utan transparenta kriterier.
+
+--------------------------------------------------
+23. SCENARIOEDITOR FÖR MVP
+--------------------------------------------------
+
+Bygg inte en fullständig visuell scenarioeditor om det äventyrar kärnfunktionerna.
+
+För MVP räcker:
+
+- tydliga JSON-filer,
+- JSON Schema,
+- type guards eller Zod-validering,
+- dokumentation,
+- exempel på hur en lärare skapar ett nytt scenario,
+- tydliga felmeddelanden om scenariot är ogiltigt.
+
+Om tid och struktur tillåter kan en enkel lokal scenarioimport läggas till:
+
+- välj scenario-JSON,
+- validera,
+- förhandsgranska,
+- starta nytt spel.
+
+--------------------------------------------------
+24. TESTER
+--------------------------------------------------
+
+Skriv enhetstester för minst:
+
+- BOM-explosion,
+- cyklisk BOM-detektering,
+- LFL,
+- FOQ,
+- POQ,
+- FPR,
+- order multiple,
+- ledtidsförskjutning,
+- säkerhetslager,
+- MRP-nettobehov,
+- ATP,
+- kapacitetsbelastning,
+- övertidskapacitet,
+- event trigger,
+- event effect,
+- seedad slump,
+- constraint evaluation,
+- export/import round trip,
+- save-file validation,
+- veckans state transitions.
+
+Skapa minst ett integrationstest för följande flöde:
+
+1. Starta scenario.
+2. Starta vecka.
+3. Ta emot leverantörsförsening.
+4. Bekräfta meddelandet.
+5. Kör planeringen.
+6. Upptäck materialbrist.
+7. Ändra leverantör eller order.
+8. Kör om planeringen.
+9. Fastställ planen.
+10. Simulera veckan.
+11. Kontrollera nytt lager- och orderläge.
+
+Tester ska använda fasta data och inte vara beroende av aktuell tid eller icke-seedad slump.
+
+--------------------------------------------------
+25. TILLGÄNGLIGHET OCH UX
+--------------------------------------------------
+
+Följ grundläggande WCAG-principer:
+
+- tangentbordsnavigation,
+- synliga fokusmarkeringar,
+- tillräcklig kontrast,
+- aria-labels när det behövs,
+- dialoger med korrekt fokuslåsning,
+- stängning med Escape där det är lämpligt,
+- status ska inte kommuniceras enbart med färg,
+- tabeller ska ha begripliga rubriker.
+
+Meddelanden och varningar ska ha både:
+
+- ikon,
+- textetikett,
+- färg.
+
+Exempel:
+
+CRITICAL, röd ikon, "Critical"
+WARNING, gul ikon, "Warning"
+
+--------------------------------------------------
+26. SPRÅK
+--------------------------------------------------
+
+Bygg applikationen så att gränssnittstext inte sprids godtyckligt i komponenterna.
+
+Skapa en enkel struktur för översättning.
+
+MVP:n ska åtminstone ha:
+
+- svenska,
+- engelska.
+
+Scenariofiler ska kunna innehålla meddelanden på båda språken.
+
+Exempel:
+
+"title": {
+  "sv": "Försenad leverans av RM2",
+  "en": "Delayed delivery of RM2"
+}
+
+--------------------------------------------------
+27. GITHUB PAGES
+--------------------------------------------------
+
+Lägg till en GitHub Actions-workflow som:
+
+1. checkar ut repository,
+2. installerar Node,
+3. kör npm ci,
+4. kör tester,
+5. kör npm run build,
+6. publicerar dist till GitHub Pages.
+
+README ska förklara:
+
+LOKALT
+
+npm install
+npm run dev
+npm run test
+npm run build
+npm run preview
+
+GITHUB PAGES
+
+- skapa repository,
+- pusha koden,
+- aktivera GitHub Pages via GitHub Actions,
+- kontrollera base-path,
+- kontrollera den publicerade sidan.
+
+Säkerställ att:
+
+- assets laddas från rätt sökväg,
+- omladdning inte orsakar 404,
+- scenariofiler laddas korrekt även från ett project repository,
+- inga absoluta sökvägar som börjar från domänroten används av misstag.
+
+--------------------------------------------------
+28. README
+--------------------------------------------------
+
+README ska innehålla:
+
+- projektets syfte,
+- pedagogisk idé,
+- funktioner,
+- skärmbildsplatshållare,
+- arkitektur,
+- teknikval,
+- installation,
+- lokal utveckling,
+- tester,
+- byggning,
+- GitHub Pages-publicering,
+- scenariostruktur,
+- eventstruktur,
+- save-file-format,
+- kända begränsningar,
+- planerade förbättringar.
+
+Beskriv även att applikationen är ett undervisningsverktyg och inte ett verkligt affärssystem för skarp produktionsstyrning.
+
+--------------------------------------------------
+29. PRIORITERINGSORDNING
+--------------------------------------------------
+
+Implementera i denna ordning:
+
+FAS 1: GRUND
+
+1. Projektstruktur och GitHub Pages-konfiguration
+2. Domänmodeller
+3. Scenarioinläsning
+4. GameState
+5. Lokal lagring
+6. Grundläggande navigation och dashboard
+
+FAS 2: PLANERING
+
+7. BOM-explosion
+8. MPS
+9. MRP
+10. Lot sizing
+11. ATP
+12. CRP
+13. Constraint engine
+
+FAS 3: SPELLOOP
+
+14. Inbox
+15. Popup-händelser
+16. Händelsemotor
+17. Beslutslogg
+18. Planeringsversioner
+19. Commit plan
+20. Simulate week
+21. Week review
+
+FAS 4: PEDAGOGIK
+
+22. Calculation traces
+23. Förklaringspanel
+24. Planjämförelse
+25. What-if-läge
+26. KPI- och rapportvyer
+
+FAS 5: DISTRIBUTION
+
+27. Export/import
+28. Instructor Review
+29. Tester
+30. Dokumentation
+31. GitHub Actions-deployment
+
+Efter varje fas ska applikationen fortfarande gå att starta och använda.
+
+--------------------------------------------------
+30. MVP:NS ACCEPTANSKRITERIER
+--------------------------------------------------
+
+MVP:n är godkänd när följande fungerar:
+
+A. Applikationen kan köras lokalt.
+
+B. Applikationen kan byggas utan fel.
+
+C. Den fungerar efter publicering på GitHub Pages.
+
+D. Studenten kan starta ett scenario.
+
+E. Studenten kan läsa en popup och senare hitta samma meddelande i Inbox.
+
+F. En leverantörsförsening kan ändra en inköpsorders ankomstperiod.
+
+G. Studenten kan köra MPS, MRP och CRP.
+
+H. Studenten kan se att leverantörsförseningen orsakar ett framtida problem.
+
+I. Studenten kan ändra minst ett relevant planeringsbeslut.
+
+J. Studenten kan köra om beräkningarna.
+
+K. Systemet skapar separata planeringsversioner.
+
+L. Studenten kan jämföra två planeringsversioner.
+
+M. Studenten kan fastställa en plan.
+
+N. Studenten kan simulera veckan.
+
+O. Lager, order och KPI:er uppdateras efter simuleringen.
+
+P. Spelet sparas automatiskt lokalt.
+
+Q. Spelet kan exporteras och importeras utan informationsförlust.
+
+R. Läraren kan importera en spelfil i Instructor Review.
+
+S. Alla centrala beräkningsfunktioner har tester.
+
+--------------------------------------------------
+31. EXEMPEL PÅ DET FÖRSTA SPELBARA FLÖDET
+--------------------------------------------------
+
+Implementera följande scenario som första vertikala flöde:
+
+VECKA 1
+
+Studenten ser normal efterfrågan och ett mindre kapacitetsproblem.
+
+Studenten:
+
+- kör planeringen,
+- granskar MRP,
+- granskar CRP,
+- ändrar partiformning eller planerad order,
+- kör om planeringen,
+- fastställer planen,
+- simulerar veckan.
+
+VECKA 2
+
+Customer Alpha skickar en förfrågan om 40 extra enheter av Product A.
+
+Studenten kan:
+
+- acceptera,
+- avböja,
+- analysera i what-if-läge.
+
+Om studenten accepterar ska efterfrågan påverkas.
+
+VECKA 3
+
+Supplier North meddelar att en leverans av RM2 blir två perioder försenad.
+
+Systemet:
+
+- visar kritisk popup,
+- sparar meddelandet i Inbox,
+- flyttar den berörda inköpsorderns ankomst,
+- räknar inte automatiskt om planen förrän studenten väljer det,
+- markerar att planeringsunderlaget har förändrats.
+
+Studenten måste:
+
+- köra planeringen,
+- se materialbrist eller risk,
+- omplanera,
+- jämföra versionerna,
+- fastställa ny plan.
+
+VECKA 4
+
+WC200 tappar 40 procent kapacitet på grund av maskinhaveri.
+
+Studenten måste hantera överbelastningen genom exempelvis:
+
+- orderförflyttning,
+- övertid,
+- extern kapacitet,
+- ändrad partiformning,
+- eller accepterad leveransrisk.
+
+Systemet ska inte välja lösning åt studenten.
+
+--------------------------------------------------
+32. KODKVALITET
+--------------------------------------------------
+
+Följ dessa krav:
+
+- strict TypeScript,
+- inga implicita any,
+- små och fokuserade funktioner,
+- begripliga namn,
+- undvik duplicerad logik,
+- separera domänlogik från UI,
+- immutable data där det är rimligt,
+- inga beräkningar direkt i stora React-komponenter,
+- inga scenario-ID:n hårdkodade i motorn,
+- inga affärsregler gömda i CSS eller JSX,
+- central felhantering,
+- begripliga felmeddelanden,
+- deterministiska tester.
+
+Kommentarer ska förklara varför en regel finns, inte upprepa vad koden uppenbart gör.
+
+--------------------------------------------------
+33. ARBETSSÄTT FÖR KODNINGSAGENTEN
+--------------------------------------------------
+
+Börja med att:
+
+1. inspektera befintligt repository om det finns,
+2. bevara fungerande kod där den passar arkitekturen,
+3. identifiera vilka delar som saknas,
+4. skapa eller uppdatera en kort implementation plan,
+5. implementera direkt.
+
+Ställ inte onödiga frågor om detaljer som kan lösas genom rimliga och dokumenterade antaganden.
+
+När information saknas:
+
+- välj ett rimligt standardvärde,
+- dokumentera antagandet i README,
+- lägg värdet i scenario- eller konfigurationsdata,
+- undvik att hårdkoda det i beräkningsmotorn.
+
+Efter varje större implementation:
+
+1. kör TypeScript-kontroll,
+2. kör lint,
+3. kör tester,
+4. bygg projektet,
+5. rätta fel innan du fortsätter.
+
+Om repository redan har en fungerande struktur, skriv inte om allt utan ett tydligt tekniskt skäl.
+
+--------------------------------------------------
+34. SLUTLIG LEVERANS FRÅN AGENTEN
+--------------------------------------------------
+
+När implementationen är färdig ska du redovisa:
+
+1. Vad som implementerats
+2. Repository-strukturen
+3. Viktiga arkitekturbeslut
+4. Antaganden i planeringslogiken
+5. Hur applikationen körs lokalt
+6. Hur testerna körs
+7. Hur GitHub Pages aktiveras
+8. Hur ett nytt scenario skapas
+9. Hur en ny händelse läggs till
+10. Hur en spelomgång exporteras och importeras
+11. Vilka begränsningar som återstår
+
+Redovisa inte bara vad som borde göras. Skapa filerna och implementera den fungerande MVP:n.
+
+ 
+	

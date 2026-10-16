@@ -1,0 +1,97 @@
+[
+  {
+    "id": "WELCOME",
+    "name": "Start of the planning game",
+    "category": "INTERNAL",
+    "trigger": { "type": "PERIOD_START", "period": 1 },
+    "probability": 1,
+    "message": {
+      "sender": "Production Manager",
+      "severity": "INFO",
+      "messageType": "INTERNAL",
+      "title": { "en": "Welcome to the planning team", "sv": "Välkommen till planeringsteamet" },
+      "body": {
+        "en": "Demand looks normal this week. Run the planning, review the MPS, MRP and capacity, and commit a plan you can defend.",
+        "sv": "Efterfrågan ser normal ut denna vecka. Kör planeringen, granska MPS, MRP och kapacitet och fastställ en plan du kan motivera."
+      }
+    },
+    "effects": [],
+    "acknowledgementRequired": true,
+    "decisionRequired": false
+  },
+  {
+    "id": "CUSTOMER-ALPHA-INCREASE",
+    "name": "Customer Alpha requests more Product A",
+    "category": "CUSTOMER",
+    "trigger": { "type": "PERIOD_START", "period": 2 },
+    "probability": 1,
+    "message": {
+      "sender": "Customer Alpha",
+      "severity": "WARNING",
+      "messageType": "CUSTOMER_REQUEST",
+      "title": { "en": "Request to increase order quantity", "sv": "Förfrågan om ökad orderkvantitet" },
+      "body": {
+        "en": "Customer Alpha requests an increase of order CO-1005 for Product A from 150 to 190 units while retaining the original delivery period.",
+        "sv": "Customer Alpha vill öka order CO-1005 för Product A från 150 till 190 enheter med oförändrad leveransperiod."
+      }
+    },
+    "choices": [
+      {
+        "id": "accept",
+        "label": { "en": "Accept", "sv": "Acceptera" },
+        "effects": [{ "type": "CHANGE_CUSTOMER_ORDER_QUANTITY", "orderId": "CO-1005", "quantity": 190 }]
+      },
+      { "id": "reject", "label": { "en": "Reject", "sv": "Avböj" }, "effects": [] },
+      {
+        "id": "review",
+        "label": { "en": "Review planning before deciding", "sv": "Analysera planeringen innan beslut" },
+        "effects": [],
+        "defersDecision": true
+      }
+    ],
+    "effects": [],
+    "acknowledgementRequired": false,
+    "decisionRequired": true
+  },
+  {
+    "id": "SUPPLIER-RM2-DELAY",
+    "name": "Delivery delay for RM2",
+    "category": "SUPPLIER",
+    "trigger": { "type": "PERIOD_START", "period": 3 },
+    "probability": 1,
+    "message": {
+      "sender": "Supplier North",
+      "severity": "CRITICAL",
+      "messageType": "CRITICAL_DISRUPTION",
+      "title": { "en": "Delayed delivery of RM2", "sv": "Försenad leverans av RM2" },
+      "body": {
+        "en": "Due to a disruption at our production facility, your confirmed RM2 delivery PUR-RM2-002 will arrive two periods later than planned.",
+        "sv": "På grund av en störning i vår produktion kommer er bekräftade RM2-leverans PUR-RM2-002 två perioder senare än planerat."
+      }
+    },
+    "effects": [{ "type": "DELAY_PURCHASE_ORDER", "purchaseOrderId": "PUR-RM2-002", "periods": 2 }],
+    "acknowledgementRequired": true,
+    "decisionRequired": false
+  },
+  {
+    "id": "WC200-BREAKDOWN",
+    "name": "Machine breakdown in sub-assembly",
+    "category": "CAPACITY",
+    "trigger": { "type": "PERIOD_START", "period": 4 },
+    "probability": 1,
+    "message": {
+      "sender": "Production Manager",
+      "severity": "CRITICAL",
+      "messageType": "CRITICAL_DISRUPTION",
+      "title": { "en": "Machine breakdown at WC200", "sv": "Maskinhaveri i WC200" },
+      "body": {
+        "en": "A press in sub-assembly WC200 has broken down. Available capacity is reduced by 40 % in periods 4 and 5.",
+        "sv": "En press i förmontering WC200 har gått sönder. Tillgänglig kapacitet minskar med 40 % i period 4 och 5."
+      }
+    },
+    "effects": [{ "type": "CHANGE_CAPACITY", "workCenterId": "WC200", "factor": 0.6, "fromPeriod": 4, "toPeriod": 5 }],
+    "durationPeriods": 2,
+    "acknowledgementRequired": true,
+    "decisionRequired": false
+  }
+]

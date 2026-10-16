@@ -1,0 +1,29 @@
+{
+  "id": "standard",
+  "version": "1.0.0",
+  "name": {
+    "en": "Standard scenario: two products, three work centres",
+    "sv": "Standardscenario: två produkter, tre arbetsstationer"
+  },
+  "description": {
+    "en": "A small manufacturing company makes Product A and Product B from frames, drive units and housings. Plan eight weeks while demand, suppliers and capacity change.",
+    "sv": "Ett litet tillverkningsföretag gör Product A och Product B av ramar, drivenheter och höljen. Planera åtta veckor medan efterfrågan, leverantörer och kapacitet förändras."
+  },
+  "settings": {
+    "currency": "SEK",
+    "gameLengthPeriods": 8,
+    "planningHorizonPeriods": 8,
+    "demandTimeFencePeriods": 2,
+    "frozenZonePeriods": 1,
+    "lateCostPerUnitPeriod": 40,
+    "eventMode": "fixed",
+    "allowPartialProduction": false,
+    "expressDelivery": { "costPerUnit": 6, "leadTimeReductionPeriods": 1 },
+    "externalCapacity": { "costPerHour": 700, "maxHoursPerPeriod": 15 }
+  },
+  "warehouses": [
+    { "id": "WH-RM", "name": "Raw material store", "type": "RAW_MATERIAL" },
+    { "id": "WH-WIP", "name": "Component store", "type": "WIP" },
+    { "id": "WH-FG", "name": "Finished goods", "type": "FINISHED_GOODS" }
+  ]
+}

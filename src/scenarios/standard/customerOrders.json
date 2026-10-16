@@ -1,0 +1,10 @@
+[
+  { "id": "CO-1001", "customerName": "Customer Alpha", "itemId": "A", "quantity": 90, "duePeriod": 1, "sellingPricePerUnit": 320, "status": "ACCEPTED", "acceptedAtPeriod": 0 },
+  { "id": "CO-1002", "customerName": "Customer Beta", "itemId": "B", "quantity": 50, "duePeriod": 1, "sellingPricePerUnit": 390, "status": "ACCEPTED", "acceptedAtPeriod": 0 },
+  { "id": "CO-1003", "customerName": "Customer Alpha", "itemId": "A", "quantity": 80, "duePeriod": 2, "sellingPricePerUnit": 320, "status": "ACCEPTED", "acceptedAtPeriod": 0 },
+  { "id": "CO-1004", "customerName": "Customer Beta", "itemId": "B", "quantity": 45, "duePeriod": 2, "sellingPricePerUnit": 390, "status": "ACCEPTED", "acceptedAtPeriod": 0 },
+  { "id": "CO-1006", "customerName": "Customer Beta", "itemId": "B", "quantity": 40, "duePeriod": 3, "sellingPricePerUnit": 390, "status": "ACCEPTED", "acceptedAtPeriod": 0 },
+  { "id": "CO-1007", "customerName": "Customer Alpha", "itemId": "A", "quantity": 60, "duePeriod": 3, "sellingPricePerUnit": 320, "status": "ACCEPTED", "acceptedAtPeriod": 0 },
+  { "id": "CO-1005", "customerName": "Customer Alpha", "itemId": "A", "quantity": 150, "duePeriod": 4, "sellingPricePerUnit": 315, "status": "ACCEPTED", "acceptedAtPeriod": 0 },
+  { "id": "CO-1008", "customerName": "Customer Beta", "itemId": "B", "quantity": 50, "duePeriod": 5, "sellingPricePerUnit": 385, "status": "ACCEPTED", "acceptedAtPeriod": 0 }
+]
