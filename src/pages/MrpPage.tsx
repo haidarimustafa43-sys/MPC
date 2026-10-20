@@ -34,7 +34,7 @@ export function MrpPage() {
             selectedId={record.itemId}
             onSelect={setSelectedId}
           />
-          <ItemPlanView record={record} itemName={item.name} unit={item.unit} />
+          <ItemPlanView key={record.itemId} record={record} itemName={item.name} unit={item.unit} />
         </>
       )}
     </>

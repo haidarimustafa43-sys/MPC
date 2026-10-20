@@ -127,6 +127,14 @@ describe("order decisions", () => {
     expect(() => expeditePurchaseOrder(game, scenario, "PUR-RM2-002", T)).toThrow(/alreadyExpedited/);
   });
 
+  it("does not expedite a purchase order that is already due this week", () => {
+    const game = planned(newGame());
+    const dueNow = { ...game.releasedOrders.find((o) => o.id === "PUR-RM2-002")!, duePeriod: game.currentPeriod };
+    const withDueNow = { ...game, releasedOrders: game.releasedOrders.map((o) => (o.id === dueNow.id ? dueNow : o)) };
+    expect(() => expeditePurchaseOrder(withDueNow, scenario, dueNow.id, T)).toThrow(/orders.alreadyDue/);
+    expect(withDueNow.financialHistory).toEqual(game.financialHistory);
+  });
+
   it("accepts or rejects proposed customer orders", () => {
     let game = planned(newGame());
     game = {

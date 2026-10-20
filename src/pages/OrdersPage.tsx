@@ -3,7 +3,12 @@ import { PlanStatusBanner } from "../components/common/PlanStatusBanner";
 import { ItemTabs } from "../components/planning/ItemTabs";
 import type { ProductionOrder, PurchaseOrder } from "../domain/order";
 import type { PlannedOrder } from "../domain/planningVersion";
-import { currentPlannedOrders, plannedOrdersDueForRelease } from "../engine/game/orderActions";
+import {
+  canExpedite,
+  currentPlannedOrders,
+  earliestReceiptPeriod,
+  plannedOrdersDueForRelease,
+} from "../engine/game/orderActions";
 import { canPerform } from "../engine/game/stateMachine";
 import { useGameStore } from "../state/gameStore";
 import { useT } from "../state/selectors";
@@ -14,9 +19,13 @@ type Tab = "planned" | "released" | "purchase" | "customer";
 function PlannedOrderEditor({ order, onClose }: { order: PlannedOrder; onClose: () => void }) {
   const t = useT();
   const firmOrder = useGameStore((state) => state.firmOrder);
+  const game = useGameStore((state) => state.game);
+  const scenario = useGameStore((state) => state.scenario);
   const [quantity, setQuantity] = useState(order.quantity);
   const [receipt, setReceipt] = useState(order.receiptPeriod);
   const [reason, setReason] = useState("");
+  if (!game || !scenario) return null;
+  const earliest = earliestReceiptPeriod(game, scenario, order);
   return (
     <form
       className="card"
@@ -35,7 +44,7 @@ function PlannedOrderEditor({ order, onClose }: { order: PlannedOrder; onClose: 
         </label>
         <label className="field">
           {t("orders.receipt")}
-          <input type="number" min={1} value={receipt} onChange={(e) => setReceipt(Number(e.target.value) || 0)} />
+          <input type="number" min={earliest} value={receipt} onChange={(e) => setReceipt(Number(e.target.value) || 0)} />
         </label>
         <label className="field" style={{ flex: 1, minWidth: 220 }}>
           {t("plan.reason")}
@@ -48,6 +57,12 @@ function PlannedOrderEditor({ order, onClose }: { order: PlannedOrder; onClose: 
           {t("action.cancel")}
         </button>
       </div>
+      <p className="muted small">{t("orders.earliestReceipt", { period: earliest })}</p>
+      {receipt > order.neededPeriod && (
+        <p className="badge warning" role="status">
+          {t("orders.lateReceipt", { needed: order.neededPeriod, receipt, item: order.itemId })}
+        </p>
+      )}
     </form>
   );
 }
@@ -282,7 +297,7 @@ export function OrdersPage() {
                         </div>
                       </td>
                       <td className="left actions">
-                        {express && order.status === "RELEASED" && !order.expedited && (
+                        {express && order.status === "RELEASED" && canExpedite(game, order) && (
                           <button disabled={!editable.allowed} title={disabledReason} onClick={() => expedite(order.id)}>
                             {t("action.expedite")}
                           </button>

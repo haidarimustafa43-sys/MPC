@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -133,6 +133,27 @@ describe("app flow", () => {
     expect(live.whatIf).toBeUndefined();
     expect(live.workCenterCapacity).toEqual([]);
     expect(live.decisions.at(-1)?.category).toBe("DISCARD_WHAT_IF");
+  });
+
+  it("keeps an overtime draft on its own work centre when switching tab without a blur", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByLabelText("Team name"), "Team Tabs");
+    await user.click(screen.getByRole("button", { name: "Start new game" }));
+    await startWeekAndAcknowledge(user);
+    await user.click(screen.getByRole("link", { name: "Dashboard" }));
+    await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
+    await user.click(screen.getByRole("link", { name: "Capacity" }));
+    await user.click(await screen.findByRole("tab", { name: /WC200/ }));
+    const overtime = screen.getByLabelText("Overtime WC200 Period 3");
+    await user.clear(overtime);
+    await user.type(overtime, "2");
+    // Safari does not focus a clicked button, so the input gets no blur: simulate with a bare click.
+    fireEvent.click(screen.getByRole("tab", { name: /WC300/ }));
+
+    expect(await screen.findByLabelText("Overtime WC300 Period 3")).toHaveValue(0);
+    const capacity = useGameStore.getState().game!.workCenterCapacity;
+    expect(capacity).toEqual([expect.objectContaining({ workCenterId: "WC200", period: 3, overtimeHours: 2 })]);
   });
 
   it("shows reports with score parts and exports after a simulated week", async () => {

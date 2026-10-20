@@ -33,6 +33,7 @@ export function MpsPage() {
             onSelect={setSelectedId}
           />
           <ItemPlanView
+            key={record.itemId}
             record={record}
             itemName={item.name}
             unit={item.unit}

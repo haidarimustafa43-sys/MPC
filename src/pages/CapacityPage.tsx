@@ -100,7 +100,7 @@ export function CapacityPage() {
                 <tr>
                   <th scope="row" className="row-label">{t("capacity.overtime")}</th>
                   {buckets.map((b) => (
-                    <td key={b.period} className="input">
+                    <td key={`${workCenter.id}-${b.period}`} className="input">
                       <CommitNumberInput
                         min={0}
                         max={workCenter.overtimeCapacityLimitHours ?? 0}
@@ -116,7 +116,7 @@ export function CapacityPage() {
                   <tr>
                     <th scope="row" className="row-label">{t("capacity.external")}</th>
                     {buckets.map((b) => (
-                      <td key={b.period} className="input">
+                      <td key={`${workCenter.id}-${b.period}`} className="input">
                         <CommitNumberInput
                           min={0}
                           max={external.maxHoursPerPeriod}

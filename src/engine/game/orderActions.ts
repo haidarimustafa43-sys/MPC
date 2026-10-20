@@ -152,6 +152,14 @@ export const releaseAllDueOrders = (
     game,
   );
 
+/** The earliest receipt period a planned order can be moved to: released this week plus lead time. */
+export const earliestReceiptPeriod = (game: GameState, scenario: Scenario, order: PlannedOrder): number =>
+  game.currentPeriod + effectiveItem(scenario, game, order.itemId).leadTimePeriods;
+
+/** Express delivery only helps an order that is not already due this week. */
+export const canExpedite = (game: GameState, order: { duePeriod: number; expedited?: boolean }): boolean =>
+  !order.expedited && order.duePeriod > game.currentPeriod;
+
 /**
  * Creates or changes a firm planned order: a fixed quantity and/or receipt
  * period. Moving an order earlier or later and changing its quantity are all
@@ -237,6 +245,7 @@ export const expeditePurchaseOrder = (
     throw new GameActionError("orders.unknownOrder", { order: orderId });
   }
   if (order.expedited) throw new GameActionError("orders.alreadyExpedited", { order: orderId });
+  if (!canExpedite(game, order)) throw new GameActionError("orders.alreadyDue", { order: orderId });
   const duePeriod = Math.max(game.currentPeriod, order.duePeriod - express.leadTimeReductionPeriods);
   const cost = order.quantity * express.costPerUnit;
   return recordDecision(
