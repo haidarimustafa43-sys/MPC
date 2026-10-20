@@ -425,6 +425,8 @@ export const en = {
   "whatIf.help": "Changes in this branch do not affect the live game until you apply them. Committing and simulating are not possible here.",
   "whatIf.summary": "{decisions} change(s), {versions} planning run(s) in this branch",
   "whatIf.rerun": "Run planning to see the effect of your latest change.",
+  "whatIf.nextStep": "Next step:",
+  "whatIf.steps": "Make a change, for example overtime under Capacity, a customer order request in the Inbox or a planning parameter, then run planning. The comparison with the live plan appears here.",
   "whatIf.showComparison": "Show comparison {live} (live) → {branch} (what-if)",
   "whatIf.hideComparison": "Hide comparison {live} → {branch}",
   "whatIf.apply": "Apply what-if to the live plan",

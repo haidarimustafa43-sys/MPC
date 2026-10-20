@@ -427,6 +427,8 @@ export const sv: Record<TranslationKey, string> = {
   "whatIf.help": "Ändringar i grenen påverkar inte det verkliga spelet förrän du tillämpar dem. Fastställa och simulera går inte här.",
   "whatIf.summary": "{decisions} ändring(ar), {versions} planeringskörning(ar) i grenen",
   "whatIf.rerun": "Kör planeringen för att se effekten av din senaste ändring.",
+  "whatIf.nextStep": "Nästa steg:",
+  "whatIf.steps": "Gör en ändring, till exempel övertid under Kapacitet, en kundförfrågan i Inkorgen eller en planeringsparameter, och kör sedan planeringen. Jämförelsen med den verkliga planen visas här.",
   "whatIf.showComparison": "Visa jämförelse {live} (verklig) → {branch} (what-if)",
   "whatIf.hideComparison": "Dölj jämförelse {live} → {branch}",
   "whatIf.apply": "Tillämpa what-if på den verkliga planen",

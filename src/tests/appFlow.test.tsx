@@ -117,6 +117,7 @@ describe("app flow", () => {
     expect(screen.getAllByText("WHAT-IF PLAN").length).toBeGreaterThan(0);
     const commit = screen.getAllByRole("button", { name: "Commit plan" })[0];
     expect(commit).toBeDisabled();
+    expect(screen.getByText(/Make a change, for example overtime/)).toBeInTheDocument();
 
     // Change something in the branch and replan there.
     await user.click(screen.getByRole("link", { name: "Capacity" }));
@@ -124,8 +125,10 @@ describe("app flow", () => {
     const overtime = screen.getByLabelText("Overtime WC200 Period 3");
     await user.clear(overtime);
     await user.type(overtime, "2{Enter}");
-    await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
+    const banner = screen.getByRole("region", { name: "WHAT-IF PLAN" });
+    await user.click(within(banner).getByRole("button", { name: "Run planning" }));
     expect(await screen.findByText(/Overload WC200: 1.0 h → 0.0 h/)).toBeInTheDocument();
+    expect(screen.queryByText(/Make a change, for example overtime/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Discard what-if" }));
     await waitFor(() => expect(screen.queryByText("You are exploring a what-if plan")).not.toBeInTheDocument());

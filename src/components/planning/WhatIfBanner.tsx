@@ -15,6 +15,7 @@ export function WhatIfBanner() {
   const scenario = useGameStore((state) => state.scenario);
   const applyWhatIf = useGameStore((state) => state.applyWhatIf);
   const discardWhatIf = useGameStore((state) => state.discardWhatIf);
+  const runPlanning = useGameStore((state) => state.runPlanning);
   const [reason, setReason] = useState("");
   const [showComparison, setShowComparison] = useState(true);
   if (!game?.whatIf || !liveGame || !scenario) return null;
@@ -36,7 +37,19 @@ export function WhatIfBanner() {
         </span>
       </div>
       <p className="small">{t("whatIf.help")}</p>
-      {stale && <p className="small">⚠ {t("whatIf.rerun")}</p>}
+      {!stale && branchVersions === 0 && (
+        <p className="small" role="status">
+          <strong>{t("whatIf.nextStep")}</strong> {t("whatIf.steps")}
+        </p>
+      )}
+      {stale && (
+        <div className="row" role="status">
+          <p className="small">⚠ {t("whatIf.rerun")}</p>
+          <button className="primary" onClick={runPlanning}>
+            {t("action.runPlanning")}
+          </button>
+        </div>
+      )}
       {base && current && current.id !== base.id && branchVersions > 0 && (
         <>
           <button className="link" onClick={() => setShowComparison(!showComparison)}>
