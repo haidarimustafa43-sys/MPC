@@ -318,6 +318,28 @@ shown with its parts and formulas; the weights are scenario data (`settings.scor
 
 It is meant for discussion, not grading.
 
+## Customer order intake [`engine/events/orderIntake.ts`]
+
+Customer orders arrive week by week (`settings.orderIntake`). At the start of each week, for
+every end item, one order is placed for the week `leadPeriods` ahead (3 in the standard
+scenario), sized around the scenario's forecast with a deviation of up to `variation`
+(±20 %), rounded to 5 units, at the item's selling price, by the listed customers in turn. An
+order the scenario already contains for that item and week takes precedence, and nothing is
+ordered for weeks after the end of the game. The quantities follow the scenario forecast, not
+the student's edited forecast: demand does not follow the plan. The deviation uses the same
+seeded rolls as the events, so in `fixed` mode every team gets the same orders. An information
+message in the Inbox lists the new orders.
+
+Because the order notice (3 weeks) is shorter than the cumulative lead time of the products,
+the plan has to rely on the forecast: a team that ignores the forecast cannot deliver.
+
+## Game balance
+
+`src/tests/balance.test.ts` plays the whole standard scenario with several strategies and
+checks that good planning pays off: reacting to the events reaches a score above 90 and 100 %
+service level, while doing nothing but releasing orders, never releasing orders, or setting the
+forecast to zero all score far lower. Run it after changing the scenario or the engine.
+
 ## Forecast changes
 
 If the scenario sets `forecastEditable`, the forecast cells of the MPS after the demand time
@@ -349,7 +371,8 @@ the same event hurts a team with low stock and not one that built safety stock.
 
 The standard scenario: end items A and B; manufactured C1 Frame, C2 Drive unit, C3 Housing
 (C3 is used on two levels); purchased RM1–RM4 (RM2 from Supplier North or Supplier Central);
-work centres WC100, WC200, WC300; 16 periods of forecast; customer orders from Customer
+work centres WC100, WC200, WC300; 16 periods of forecast; weekly customer orders (see Customer
+order intake) on top of the initial orders from Customer
 Alpha and Customer Beta; open production and purchase orders; four events (welcome,
 customer request in week 2, RM2 delay in week 3, WC200 breakdown in week 4).
 
@@ -380,10 +403,10 @@ random), `probability`, `message` (sender, severity, type, bilingual title/body)
 `"defersDecision": true` keeps the request open. To add an event, append it to
 `events.json` and run `npm run test`; the schema reports mistakes.
 
-In the standard scenario the events are tuned so that a planner who simply releases what MRP
-suggests still meets them: the RM2 delay (week 3) leaves RM2 short by about 50 units in
-period 4, and the WC200 breakdown (−40 % in periods 4–6) overloads WC200 by about 11 hours in
-period 6.
+In the standard scenario the events are tuned so that they hurt a team that does not react:
+the RM2 delay (week 3) leaves RM2 short from period 4 (with the normal supplier no new order can
+arrive in time), and the WC200 breakdown (−40 % in periods 4–6) overloads WC200 by about 25 hours
+in period 4. A team that only releases what MRP suggests ends at about 69 % service level.
 
 ## Saved games, export and import
 

@@ -42,7 +42,7 @@ describe(".mpcgame export and import", () => {
       schemaVersion: 1,
       exportedAt: T,
       scenarioId: "standard",
-      scenarioVersion: "1.0.0",
+      scenarioVersion: "1.1.0",
     });
     expect(file.checksum).toBe(checksumOf(file.gameState));
     expect(exportFileName(file.gameState)).toBe("Team_North__standard_week1.mpcgame");

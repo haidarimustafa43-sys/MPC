@@ -121,6 +121,34 @@
             "forecastEditable": {
               "type": "boolean"
             },
+            "orderIntake": {
+              "type": "object",
+              "properties": {
+                "leadPeriods": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "variation": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "customers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": [
+                "leadPeriods",
+                "variation",
+                "customers"
+              ],
+              "additionalProperties": false
+            },
             "scoring": {
               "type": "object",
               "properties": {

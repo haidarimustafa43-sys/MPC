@@ -14,6 +14,8 @@ const startWeekAndAcknowledge = async (user: User) => {
   await user.click((await screen.findAllByRole("button", { name: "Read new messages" }))[0]);
   expect(await screen.findByRole("heading", { name: "Welcome to the planning team" })).toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Acknowledge" }));
+  // This week's incoming customer orders are information that also has to be read.
+  await user.click(screen.getByRole("button", { name: /New customer orders for week 4/ }));
 };
 
 describe("app flow", () => {

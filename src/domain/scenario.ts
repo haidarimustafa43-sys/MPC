@@ -25,8 +25,19 @@ export interface ScenarioSettings {
   externalCapacity?: { costPerHour: number; maxHoursPerPeriod: number };
   /** Students may change the forecast for periods after the demand time fence. */
   forecastEditable?: boolean;
+  /** Customer orders that arrive every week, derived from the forecast (see README). */
+  orderIntake?: OrderIntakeSettings;
   /** Weights of the illustrative total score (see README); not a grade. */
   scoring?: ScoringSettings;
+}
+
+export interface OrderIntakeSettings {
+  /** Orders arrive this many periods before they are due. */
+  leadPeriods: number;
+  /** Relative deviation from the forecast, e.g. 0.2 = up to ±20 %. */
+  variation: number;
+  /** Customers take turns, one order per item and week. */
+  customers: string[];
 }
 
 export interface ScoringSettings {

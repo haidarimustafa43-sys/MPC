@@ -208,6 +208,13 @@ export const scenarioSchema: z.ZodType<Scenario> = z.object({
       .optional(),
     externalCapacity: z.object({ costPerHour: nonNegative, maxHoursPerPeriod: nonNegative }).optional(),
     forecastEditable: z.boolean().optional(),
+    orderIntake: z
+      .object({
+        leadPeriods: z.number().int().min(1),
+        variation: z.number().min(0).max(1),
+        customers: z.array(z.string().min(1)).min(1),
+      })
+      .optional(),
     scoring: z
       .object({
         deliveryWeight: nonNegative,

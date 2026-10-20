@@ -12,6 +12,7 @@ import type { Scenario } from "../../domain/scenario";
 import type { PlanningInput } from "../planningInput";
 import { applyPlanningParameters, horizonPeriods } from "../planningInput";
 import { runPlanning } from "../planning/runPlanning";
+import { receiveCustomerOrders } from "../events/orderIntake";
 import { processEvents } from "../events/processEvents";
 import { GameActionError } from "./errors";
 import { hasUnhandledMessages, transition } from "./stateMachine";
@@ -109,7 +110,8 @@ export const createGameState = (scenario: Scenario, options: NewGameOptions): Ga
  */
 export const startPeriod = (game: GameState, scenario: Scenario, now: string, entropy = 0): GameState => {
   transition(game, "START_PERIOD");
-  const withEvents = processEvents(game, scenario, "PERIOD_START", game.currentPeriod, entropy);
+  const withOrders = receiveCustomerOrders(game, scenario, game.currentPeriod, entropy);
+  const withEvents = processEvents(withOrders, scenario, "PERIOD_START", game.currentPeriod, entropy);
   return {
     ...withEvents,
     gameStatus: hasUnhandledMessages(withEvents) ? "EVENTS_PENDING" : "ANALYSIS",

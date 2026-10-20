@@ -1,6 +1,6 @@
 {
   "id": "standard",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": {
     "en": "Standard scenario: two products, three work centres",
     "sv": "Standardscenario: två produkter, tre arbetsstationer"
@@ -31,7 +31,15 @@
       "deliveryWeight": 40,
       "financialWeight": 40,
       "planAdherenceWeight": 20,
-      "referenceNetContributionPerPeriod": 45000
+      "referenceNetContributionPerPeriod": 50000
+    },
+    "orderIntake": {
+      "leadPeriods": 3,
+      "variation": 0.2,
+      "customers": [
+        "Customer Alpha",
+        "Customer Beta"
+      ]
     }
   },
   "warehouses": [

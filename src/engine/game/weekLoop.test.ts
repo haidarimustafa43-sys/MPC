@@ -46,13 +46,16 @@ describe("inbox", () => {
   it("delivers the welcome message at the start and leaves EVENTS_PENDING once it is acknowledged", () => {
     const started = startPeriod(newGame(), scenario, T);
     expect(started.gameStatus).toBe("EVENTS_PENDING");
-    const message = started.inboxMessages[0];
-    expect(message).toMatchObject({ id: "MSG-WELCOME-1", status: "UNREAD", acknowledgementRequired: true });
+    const message = started.inboxMessages.find((m) => m.id === "MSG-WELCOME-1")!;
+    expect(message).toMatchObject({ status: "UNREAD", acknowledgementRequired: true });
     const read = markMessageRead(started, message.id);
     expect(read.gameStatus).toBe("EVENTS_PENDING");
     const acknowledged = acknowledgeMessage(read, message.id);
-    expect(acknowledged.gameStatus).toBe("ANALYSIS");
-    expect(acknowledged.inboxMessages[0].status).toBe("ACKNOWLEDGED");
+    // The week's order intake message still has to be read.
+    expect(acknowledged.gameStatus).toBe("EVENTS_PENDING");
+    const done = markMessageRead(acknowledged, "MSG-ORDER-INTAKE-1");
+    expect(done.gameStatus).toBe("ANALYSIS");
+    expect(done.inboxMessages.find((m) => m.id === message.id)?.status).toBe("ACKNOWLEDGED");
   });
 
   it("lets a customer request stay open for review and applies the chosen answer", () => {
@@ -235,10 +238,17 @@ describe("integration: supplier delay → shortage → replan → commit → sim
     game = finishWeek(finishWeek(game));
     expect(game.currentPeriod).toBe(4);
     game = runPlanningVersion(game, scenario, T);
-    const overload = latestVersion(game)!.violations.find(
-      (v) => v.type === "WORK_CENTER_OVERLOAD" && v.workCenterId === "WC200" && v.period === 6,
+    const version = latestVersion(game)!;
+    const reduced = version.crpResult.buckets.filter((b) => b.workCenterId === "WC200" && b.capacityFactor < 1);
+    expect(reduced.map((b) => [b.period, b.availableHours])).toEqual([
+      [4, 21],
+      [5, 21],
+      [6, 21],
+    ]);
+    const overloads = version.violations.filter(
+      (v) => v.type === "WORK_CENTER_OVERLOAD" && v.workCenterId === "WC200" && (v.period ?? 0) <= 6,
     );
-    expect(overload?.description).toContain("11 hours");
+    expect(overloads.length).toBeGreaterThan(0);
   });
 });
 
