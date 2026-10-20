@@ -1,11 +1,22 @@
 import { useState } from "react";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import type { GameState } from "../domain/gameState";
 import type { Scenario } from "../domain/scenario";
 import { parseGameFile } from "../importExport/validateSaveFile";
 import { summarizeGame, type GameSummary } from "../engine/scoring/gameSummary";
 import { isKnownScenario, loadScenario } from "../scenarios";
+import { useGameStore } from "../state/gameStore";
 import { useT } from "../state/selectors";
+import { describeDecision } from "../utils/describeDecision";
 import { readFileText } from "../utils/download";
 import { formatMoney, formatNumber, formatPercent } from "../utils/format";
 
@@ -13,6 +24,7 @@ interface LoadedGame {
   key: string;
   fileName: string;
   game: GameState;
+  scenario?: Scenario;
   summary: GameSummary;
   currency: string;
 }
@@ -38,6 +50,7 @@ const scenarioFor = (game: GameState, embedded?: Scenario): Scenario | undefined
  */
 export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
   const t = useT();
+  const language = useGameStore((state) => state.language);
   const [games, setGames] = useState<LoadedGame[]>([]);
   const [failed, setFailed] = useState<FailedFile[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -57,11 +70,15 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
         key: `${file.name}-${result.value.gameState.gameId}-${result.value.exportedAt}`,
         fileName: file.name,
         game: result.value.gameState,
+        scenario,
         summary: summarizeGame(result.value.gameState, scenario?.settings.scoring),
         currency: scenario?.settings.currency ?? "",
       });
     }
-    setGames((current) => [...current, ...loaded.filter((g) => !current.some((c) => c.key === g.key))]);
+    setGames((current) => [
+      ...current,
+      ...loaded.filter((g) => !current.some((c) => c.key === g.key)),
+    ]);
     setFailed(errors);
   };
 
@@ -86,11 +103,21 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
       <section className="card">
         <label className="field">
           {t("instructor.chooseFiles")}
-          <input type="file" accept=".mpcgame,application/json" multiple onChange={(e) => void addFiles(e.target.files)} />
+          <input
+            type="file"
+            accept=".mpcgame,application/json"
+            multiple
+            onChange={(e) => void addFiles(e.target.files)}
+          />
         </label>
         <p className="muted small">{t("instructor.privacy")}</p>
         {failed.map((file) => (
-          <div key={file.fileName} className="banner critical" role="alert" style={{ marginTop: "0.5rem" }}>
+          <div
+            key={file.fileName}
+            className="banner critical"
+            role="alert"
+            style={{ marginTop: "0.5rem" }}
+          >
             <strong>{file.fileName}:</strong> {file.errors.join(" ")}
           </div>
         ))}
@@ -106,9 +133,13 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
                 <thead>
                   <tr>
                     <th scope="col">{t("start.teamName")}</th>
-                    <th scope="col" className="left">{t("start.scenario")}</th>
+                    <th scope="col" className="left">
+                      {t("start.scenario")}
+                    </th>
                     <th scope="col">{t("instructor.finalWeek")}</th>
-                    <th scope="col" className="left">{t("instructor.completed")}</th>
+                    <th scope="col" className="left">
+                      {t("instructor.completed")}
+                    </th>
                     <th scope="col">{t("kpi.serviceLevel")}</th>
                     <th scope="col">{t("kpi.netContribution")}</th>
                     <th scope="col">{t("kpi.holdingCost")}</th>
@@ -135,7 +166,11 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
                       </td>
                       <td>{summary.finalPeriod}</td>
                       <td className="left">
-                        {summary.completed ? <span className="badge ok">{t("instructor.yes")}</span> : <span className="badge info">{t("instructor.no")}</span>}
+                        {summary.completed ? (
+                          <span className="badge ok">{t("instructor.yes")}</span>
+                        ) : (
+                          <span className="badge info">{t("instructor.no")}</span>
+                        )}
                       </td>
                       <td>{formatPercent(summary.totals.serviceLevel)}</td>
                       <td>{formatMoney(summary.totals.netContribution, currency)}</td>
@@ -148,7 +183,12 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
                         {formatNumber(summary.score.total, 1)} / {summary.score.maxTotal}
                       </td>
                       <td className="left">
-                        <button className="danger" onClick={() => setGames((current) => current.filter((g) => g.key !== key))}>
+                        <button
+                          className="danger"
+                          onClick={() =>
+                            setGames((current) => current.filter((g) => g.key !== key))
+                          }
+                        >
                           {t("action.delete")}
                         </button>
                       </td>
@@ -170,7 +210,12 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
                     <YAxis domain={[0, 100]} unit=" %" width={50} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="serviceLevel" name={t("kpi.serviceLevel")} fill="#18794e" isAnimationActive={false} />
+                    <Bar
+                      dataKey="serviceLevel"
+                      name={t("kpi.serviceLevel")}
+                      fill="#18794e"
+                      isAnimationActive={false}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -182,8 +227,18 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
                     <YAxis width={70} />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="netContribution" name={t("kpi.netContribution")} fill="#4f81bd" isAnimationActive={false} />
-                    <Bar dataKey="holdingCost" name={t("kpi.holdingCost")} fill="#f2a93b" isAnimationActive={false} />
+                    <Bar
+                      dataKey="netContribution"
+                      name={t("kpi.netContribution")}
+                      fill="#4f81bd"
+                      isAnimationActive={false}
+                    />
+                    <Bar
+                      dataKey="holdingCost"
+                      name={t("kpi.holdingCost")}
+                      fill="#f2a93b"
+                      isAnimationActive={false}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -209,8 +264,11 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
                           </span>
                           <div>
                             <div>
-                              <strong>{decision.category}</strong> · {decision.entityId ?? ""}{" "}
-                              {decision.newValue !== undefined ? `→ ${JSON.stringify(decision.newValue)}` : ""}
+                              <strong>
+                                {describeDecision(decision, t, detail.scenario, language).category}
+                              </strong>{" "}
+                              · {describeDecision(decision, t, detail.scenario, language).object}:{" "}
+                              {describeDecision(decision, t, detail.scenario, language).change}
                             </div>
                             {decision.reason && <div className="related">“{decision.reason}”</div>}
                           </div>
@@ -245,7 +303,8 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
                   <ul>
                     {detail.game.completedPeriods.map((result) => (
                       <li key={result.period}>
-                        {t("review.week")} {result.period}: {formatPercent(result.kpis.serviceLevel)},{" "}
+                        {t("review.week")} {result.period}:{" "}
+                        {formatPercent(result.kpis.serviceLevel)},{" "}
                         {formatMoney(result.kpis.netContribution, detail.currency)},{" "}
                         {t("instructor.failures", { count: result.failures.length })}
                       </li>

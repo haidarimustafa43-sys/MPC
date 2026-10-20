@@ -6,6 +6,7 @@ import { cumulativeServiceLevel } from "../engine/events/evaluateEventTriggers";
 import { latestVersion } from "../engine/game/gameActions";
 import { useGameStore } from "../state/gameStore";
 import { currentViolations, useT } from "../state/selectors";
+import { describeDecision } from "../utils/describeDecision";
 import { formatHours, formatMoney, formatPercent } from "../utils/format";
 
 const nextStepKey = (status: string, stale: boolean, hasVersion: boolean): string => {
@@ -31,6 +32,7 @@ export function DashboardPage() {
   const t = useT();
   const game = useGameStore((state) => state.game);
   const scenario = useGameStore((state) => state.scenario);
+  const language = useGameStore((state) => state.language);
   if (!game || !scenario) return null;
   const version = latestVersion(game);
   const kpis = version?.projectedKpis;
@@ -38,7 +40,10 @@ export function DashboardPage() {
   const violations = currentViolations(game, scenario.settings.frozenZonePeriods).filter(
     (v) => v.severity !== "INFO",
   );
-  const realisedResult = game.kpiHistory.reduce((sum, entry) => sum + entry.kpis.netContribution, 0);
+  const realisedResult = game.kpiHistory.reduce(
+    (sum, entry) => sum + entry.kpis.netContribution,
+    0,
+  );
   const activeEffects = game.activeEventEffects.filter(
     (effect) => effect.fromPeriod <= game.currentPeriod && effect.toPeriod >= game.currentPeriod,
   );
@@ -66,8 +71,14 @@ export function DashboardPage() {
         <>
           <h2>{t("dashboard.realised")}</h2>
           <div className="grid kpis">
-            <KpiCard label={t("dashboard.cumulativeService")} value={formatPercent(cumulativeServiceLevel(game))} />
-            <KpiCard label={t("dashboard.cumulativeResult")} value={formatMoney(realisedResult, currency)} />
+            <KpiCard
+              label={t("dashboard.cumulativeService")}
+              value={formatPercent(cumulativeServiceLevel(game))}
+            />
+            <KpiCard
+              label={t("dashboard.cumulativeResult")}
+              value={formatMoney(realisedResult, currency)}
+            />
             <KpiCard
               label={t("kpi.lateCustomerOrders")}
               value={game.customerOrders.filter((order) => order.status === "LATE").length}
@@ -79,7 +90,9 @@ export function DashboardPage() {
       {activeEffects.length > 0 && (
         <div className="banner warning" role="status">
           <strong>{t("dashboard.activeEffects")}:</strong>{" "}
-          {activeEffects.map((effect) => `${effect.description} (${effect.fromPeriod}–${effect.toPeriod})`).join(" · ")}
+          {activeEffects
+            .map((effect) => `${effect.description} (${effect.fromPeriod}–${effect.toPeriod})`)
+            .join(" · ")}
         </div>
       )}
 
@@ -88,13 +101,19 @@ export function DashboardPage() {
           <p className="muted small">{t("dashboard.kpisFrom", { version: version.id })}</p>
           <div className="grid kpis">
             <KpiCard label={t("dashboard.serviceLevel")} value={formatPercent(kpis.serviceLevel)} />
-            <KpiCard label={t("dashboard.result")} value={formatMoney(kpis.netContribution, currency)} />
+            <KpiCard
+              label={t("dashboard.result")}
+              value={formatMoney(kpis.netContribution, currency)}
+            />
             <KpiCard
               label={t("dashboard.inventoryValue")}
               value={formatMoney(kpis.averageInventoryValue, currency)}
             />
             <KpiCard label={t("dashboard.overload")} value={formatHours(kpis.overloadHours)} />
-            <KpiCard label={t("dashboard.atRisk")} value={kpis.ordersAtRisk + kpis.lateCustomerOrders} />
+            <KpiCard
+              label={t("dashboard.atRisk")}
+              value={kpis.ordersAtRisk + kpis.lateCustomerOrders}
+            />
             <KpiCard label={t("kpi.replanCount")} value={kpis.replanCount} />
           </div>
         </>
@@ -125,11 +144,9 @@ export function DashboardPage() {
                   <span className="badge mode">{decision.id}</span>
                   <div>
                     <div>
-                      <strong>{decision.category}</strong> · {decision.entityId}
-                      {decision.field && !decision.field.includes("@") ? ` · ${decision.field}` : ""}
-                      {decision.previousValue !== undefined || decision.newValue !== undefined
-                        ? `: ${JSON.stringify(decision.previousValue ?? "–")} → ${JSON.stringify(decision.newValue ?? "–")}`
-                        : ""}
+                      <strong>{describeDecision(decision, t, scenario, language).category}</strong>{" "}
+                      · {describeDecision(decision, t, scenario, language).object}:{" "}
+                      {describeDecision(decision, t, scenario, language).change}
                     </div>
                     {decision.reason && <div className="related">“{decision.reason}”</div>}
                   </div>
