@@ -18,12 +18,37 @@
     "lateCostPerUnitPeriod": 40,
     "eventMode": "fixed",
     "allowPartialProduction": false,
-    "expressDelivery": { "costPerUnit": 6, "leadTimeReductionPeriods": 1 },
-    "externalCapacity": { "costPerHour": 700, "maxHoursPerPeriod": 15 }
+    "expressDelivery": {
+      "costPerUnit": 6,
+      "leadTimeReductionPeriods": 1
+    },
+    "externalCapacity": {
+      "costPerHour": 700,
+      "maxHoursPerPeriod": 15
+    },
+    "forecastEditable": true,
+    "scoring": {
+      "deliveryWeight": 40,
+      "financialWeight": 40,
+      "planAdherenceWeight": 20,
+      "referenceNetContributionPerPeriod": 45000
+    }
   },
   "warehouses": [
-    { "id": "WH-RM", "name": "Raw material store", "type": "RAW_MATERIAL" },
-    { "id": "WH-WIP", "name": "Component store", "type": "WIP" },
-    { "id": "WH-FG", "name": "Finished goods", "type": "FINISHED_GOODS" }
+    {
+      "id": "WH-RM",
+      "name": "Raw material store",
+      "type": "RAW_MATERIAL"
+    },
+    {
+      "id": "WH-WIP",
+      "name": "Component store",
+      "type": "WIP"
+    },
+    {
+      "id": "WH-FG",
+      "name": "Finished goods",
+      "type": "FINISHED_GOODS"
+    }
   ]
 }

@@ -138,9 +138,11 @@ const effectSchema = z.discriminatedUnion("type", [
     quantity: z.number().positive(),
     duePeriod: period,
     sellingPricePerUnit: nonNegative,
+    status: z.enum(["ACCEPTED", "PROPOSED"]).optional(),
   }),
   z.object({ type: z.literal("CHANGE_CUSTOMER_ORDER_QUANTITY"), orderId: z.string(), quantity: z.number().positive() }),
   z.object({ type: z.literal("SUPPLIER_UNAVAILABLE"), supplierId: z.string(), fromPeriod: period, toPeriod: period }),
+  z.object({ type: z.literal("SUPPLIER_AVAILABLE"), supplierId: z.string() }),
   z.object({ type: z.literal("SCRAP_INVENTORY"), itemId: z.string(), quantity: z.number().positive() }),
 ]);
 
@@ -205,6 +207,15 @@ export const scenarioSchema: z.ZodType<Scenario> = z.object({
       .object({ costPerUnit: nonNegative, leadTimeReductionPeriods: z.number().int().min(0) })
       .optional(),
     externalCapacity: z.object({ costPerHour: nonNegative, maxHoursPerPeriod: nonNegative }).optional(),
+    forecastEditable: z.boolean().optional(),
+    scoring: z
+      .object({
+        deliveryWeight: nonNegative,
+        financialWeight: nonNegative,
+        planAdherenceWeight: nonNegative,
+        referenceNetContributionPerPeriod: z.number().positive(),
+      })
+      .optional(),
   }),
   warehouses: z
     .array(

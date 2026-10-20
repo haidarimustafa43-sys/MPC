@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import type { Language } from "../domain/common";
+import { openInstructorReview } from "../app/navigation";
 import { useGameStore } from "../state/gameStore";
 import { useT } from "../state/selectors";
 
@@ -11,6 +12,7 @@ export function SettingsPage() {
   const game = useGameStore((state) => state.game);
   const newGame = useGameStore((state) => state.newGame);
   const closeGame = useGameStore((state) => state.closeGame);
+  const exportGame = useGameStore((state) => state.exportGame);
   if (!game) return null;
 
   return (
@@ -38,6 +40,10 @@ export function SettingsPage() {
           <dd>{game.randomSeed}</dd>
         </dl>
         <div className="row">
+          <button className="primary" onClick={exportGame}>
+            {t("io.exportGame")}
+          </button>
+          <button onClick={openInstructorReview}>{t("instructor.open")}</button>
           <button
             onClick={() => {
               closeGame();
@@ -59,6 +65,7 @@ export function SettingsPage() {
         <p className="muted small" style={{ marginTop: "0.5rem" }}>
           {t("settings.resetHelp")}
         </p>
+        <p className="muted small">{t("io.exportHelp")}</p>
       </section>
     </>
   );

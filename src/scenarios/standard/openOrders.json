@@ -6,7 +6,7 @@
   ],
   "purchaseOrders": [
     { "id": "PUR-RM1-001", "kind": "PURCHASE", "itemId": "RM1", "quantity": 600, "releasePeriod": 0, "duePeriod": 2, "status": "RELEASED", "supplierId": "SUP-NORTH" },
-    { "id": "PUR-RM2-001", "kind": "PURCHASE", "itemId": "RM2", "quantity": 200, "releasePeriod": 0, "duePeriod": 2, "status": "RELEASED", "supplierId": "SUP-NORTH" },
+    { "id": "PUR-RM2-001", "kind": "PURCHASE", "itemId": "RM2", "quantity": 150, "releasePeriod": 0, "duePeriod": 2, "status": "RELEASED", "supplierId": "SUP-NORTH" },
     { "id": "PUR-RM2-002", "kind": "PURCHASE", "itemId": "RM2", "quantity": 200, "releasePeriod": 1, "duePeriod": 4, "status": "RELEASED", "supplierId": "SUP-NORTH" },
     { "id": "PUR-RM3-001", "kind": "PURCHASE", "itemId": "RM3", "quantity": 500, "releasePeriod": 0, "duePeriod": 1, "status": "RELEASED", "supplierId": "SUP-CENTRAL" }
   ]

@@ -44,10 +44,39 @@ export class ScenarioError extends Error {
 }
 
 const cache = new Map<string, Scenario>();
+/** Scenarios imported at runtime (validated before registration). */
+const custom = new Map<string, Scenario>();
 
-export const scenarioIds = (): string[] => Object.keys(rawScenarios);
+export const builtInScenarioIds = (): string[] => Object.keys(rawScenarios);
+export const scenarioIds = (): string[] => [...Object.keys(rawScenarios), ...custom.keys()];
+export const isBuiltInScenario = (id: string): boolean => id in rawScenarios;
+export const isKnownScenario = (id: string): boolean => id in rawScenarios || custom.has(id);
+export const customScenario = (id: string): Scenario | undefined => custom.get(id);
+
+/**
+ * Validates and registers a scenario that is not built in (imported JSON).
+ * Built-in ids cannot be replaced.
+ */
+export const registerScenario = (data: unknown): { ok: true; scenario: Scenario } | { ok: false; errors: string[] } => {
+  const result = validateScenario(data);
+  if (!result.ok) return result;
+  if (isBuiltInScenario(result.scenario.id)) {
+    return { ok: false, errors: [`The id "${result.scenario.id}" belongs to a built-in scenario. Choose another id.`] };
+  }
+  custom.set(result.scenario.id, result.scenario);
+  return { ok: true, scenario: result.scenario };
+};
+
+export const unregisterScenario = (id: string): void => {
+  custom.delete(id);
+};
+
+/** The built-in scenario as one JSON document, as a template for teachers. */
+export const scenarioAsJson = (id: string): string => JSON.stringify(loadScenario(id), null, 2);
 
 export const loadScenario = (id: string): Scenario => {
+  const imported = custom.get(id);
+  if (imported) return imported;
   const cached = cache.get(id);
   if (cached) return cached;
   const raw = rawScenarios[id];

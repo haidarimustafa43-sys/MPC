@@ -2,12 +2,16 @@ import { createHashRouter, Navigate } from "react-router-dom";
 import { AppLayout } from "../components/layout/AppLayout";
 import { CapacityPage } from "../pages/CapacityPage";
 import { DashboardPage } from "../pages/DashboardPage";
+import { DecisionLogPage } from "../pages/DecisionLogPage";
+import { InboxPage } from "../pages/InboxPage";
 import { InventoryPage } from "../pages/InventoryPage";
 import { MasterDataPage } from "../pages/MasterDataPage";
 import { MpsPage } from "../pages/MpsPage";
 import { MrpPage } from "../pages/MrpPage";
 import { OrdersPage } from "../pages/OrdersPage";
+import { PeriodReviewPage } from "../pages/PeriodReviewPage";
 import { PlanningVersionsPage } from "../pages/PlanningVersionsPage";
+import { ReportsPage } from "../pages/ReportsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 
 /*
@@ -20,6 +24,10 @@ export const router = createHashRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: "inbox", element: <InboxPage /> },
+      { path: "review", element: <PeriodReviewPage /> },
+      { path: "decisions", element: <DecisionLogPage /> },
+      { path: "reports", element: <ReportsPage /> },
       { path: "mps", element: <MpsPage /> },
       { path: "mrp", element: <MrpPage /> },
       { path: "capacity", element: <CapacityPage /> },

@@ -2,7 +2,7 @@ import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createGameState, runPlanningVersion, startPeriod } from "../engine/game/gameActions";
 import { loadScenario } from "../scenarios";
-import { FIXED_TIME } from "../tests/fixtures";
+import { FIXED_TIME, takeInMessages } from "../tests/fixtures";
 import { closeDatabase } from "./database";
 import { migrateGameState, SaveFileError } from "./migrations";
 import { deleteSave, duplicateSave, listSaves, loadGame, renameSave, saveGame } from "./saveRepository";
@@ -22,7 +22,7 @@ describe("save repository (IndexedDB)", () => {
   });
 
   it("saves and loads a game without information loss", async () => {
-    const played = runPlanningVersion(startPeriod(game("g1"), FIXED_TIME), scenario, FIXED_TIME);
+    const played = runPlanningVersion(takeInMessages(startPeriod(game("g1"), scenario, FIXED_TIME)), scenario, FIXED_TIME);
     await saveGame(played);
     expect(await loadGame("g1")).toEqual(played);
   });

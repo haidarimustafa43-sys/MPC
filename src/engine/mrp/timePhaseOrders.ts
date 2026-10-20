@@ -19,6 +19,8 @@ export interface TimePhaseInput {
   orderCost: number;
   holdingCostPerUnitPeriod: number;
   lowLevelCode: number;
+  /** Firm planned orders of this item; MRP keeps them as they are and plans around them. */
+  firmOrders?: readonly PlannedOrder[];
 }
 
 const riskOf = (balance: number, safetyStock: number): CellRisk =>
@@ -36,6 +38,9 @@ const riskOf = (balance: number, safetyStock: number): CellRisk =>
  *   at the latest to the period of need). If even that is impossible the need
  *   lies inside the lead time: no order is created, the shortage carries
  *   forward and is reported. This is how a supplier delay becomes visible.
+ * - Firm planned orders are kept as they are. Up to the latest firm order no
+ *   new orders are generated (firm zone), so the effect of moving an order is
+ *   visible instead of being silently replanned.
  */
 export const timePhaseOrders = (input: TimePhaseInput): ItemPlanRecord => {
   const n = input.periods.length;
@@ -52,6 +57,25 @@ export const timePhaseOrders = (input: TimePhaseInput): ItemPlanRecord => {
 
   const { safetyStock, leadTimePeriods, safetyLeadTimePeriods, currentPeriod } = input;
   const indexOf = (period: number): number => period - input.periods[0];
+  const firmPeriods: number[] = [];
+  const firmZoneEnd = Math.max(-Infinity, ...(input.firmOrders ?? []).map((order) => order.receiptPeriod));
+
+  for (const firm of input.firmOrders ?? []) {
+    const receiptIndex = indexOf(firm.receiptPeriod);
+    if (receiptIndex >= n) continue;
+    // A firm receipt dated before the horizon still has to arrive; count it now.
+    plannedReceipts[Math.max(0, receiptIndex)] += firm.quantity;
+    const releaseIndex = indexOf(firm.releasePeriod);
+    if (releaseIndex >= 0 && releaseIndex < n) plannedReleases[releaseIndex] += firm.quantity;
+    plannedOrders.push({ ...firm, firm: true });
+    firmPeriods.push(input.periods[Math.max(0, receiptIndex)]);
+    traces[`receipt:${input.periods[Math.max(0, receiptIndex)]}`] = {
+      formula: "firm planned order = quantity fixed by the planner",
+      inputs: { orderId: firm.id, quantity: firm.quantity, releasePeriod: firm.releasePeriod },
+      result: firm.quantity,
+      explanationKey: "mrp.firm",
+    };
+  }
 
   let released = input.startingOnHand;
   for (let i = 0; i < n; i++) {
@@ -95,7 +119,9 @@ export const timePhaseOrders = (input: TimePhaseInput): ItemPlanRecord => {
     const desiredReceipt = period - safetyLeadTimePeriods;
     const receiptPeriod = Math.max(desiredReceipt, earliestReceipt, input.periods[0]);
 
-    if (receiptPeriod > period) {
+    // Inside the firm zone (up to the latest firm planned order) MRP does not add
+    // orders of its own: the planner has taken control and must see the gap.
+    if (receiptPeriod > period || period <= firmZoneEnd) {
       if (net[i] > 0) uncoveredPeriods.push(period);
       pab[i] = projected;
       previous = projected;
@@ -194,5 +220,6 @@ export const timePhaseOrders = (input: TimePhaseInput): ItemPlanRecord => {
     plannedOrders,
     traces,
     uncoveredPeriods,
+    firmPeriods,
   };
 };

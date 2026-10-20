@@ -42,9 +42,12 @@ export type EventEffect =
       quantity: number;
       duePeriod: number;
       sellingPricePerUnit: number;
+      /** PROPOSED orders wait for the student to accept or reject them on the Orders page. */
+      status?: "ACCEPTED" | "PROPOSED";
     }
   | { type: "CHANGE_CUSTOMER_ORDER_QUANTITY"; orderId: string; quantity: number }
   | { type: "SUPPLIER_UNAVAILABLE"; supplierId: string; fromPeriod: number; toPeriod: number }
+  | { type: "SUPPLIER_AVAILABLE"; supplierId: string }
   | { type: "SCRAP_INVENTORY"; itemId: string; quantity: number };
 
 export interface EventChoice {

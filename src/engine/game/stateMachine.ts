@@ -24,6 +24,15 @@ const TRANSITIONS: Record<GameAction, readonly GameStatus[]> = {
   NEXT_PERIOD: ["PERIOD_REVIEW"],
 };
 
+/** A what-if branch is for exploring only: nothing that fixes or plays out a plan. */
+const WHAT_IF_BLOCKED: readonly GameAction[] = [
+  "START_PERIOD",
+  "COMMIT_PLAN",
+  "SIMULATE_PERIOD",
+  "REVIEW_PERIOD",
+  "NEXT_PERIOD",
+];
+
 export interface TransitionCheck {
   allowed: boolean;
   /** i18n key explaining why the action is not possible. */
@@ -33,13 +42,25 @@ export interface TransitionCheck {
 const latestVersionThisPeriod = (game: GameState) =>
   game.planningVersions.filter((version) => version.period === game.currentPeriod).at(-1);
 
-const hasOpenBlockingMessage = (game: GameState): boolean =>
+const isUnacknowledged = (message: GameState["inboxMessages"][number]): boolean =>
+  message.acknowledgementRequired && message.status !== "ACKNOWLEDGED" && message.status !== "RESPONDED";
+
+/**
+ * New information must be taken in before analysis: every message of this
+ * period read, and every message that needs it acknowledged.
+ */
+export const hasUnhandledMessages = (game: GameState): boolean =>
   game.inboxMessages.some(
-    (message) =>
-      (message.decisionRequired && message.status !== "RESPONDED") ||
-      (message.acknowledgementRequired &&
-        message.status !== "ACKNOWLEDGED" &&
-        message.status !== "RESPONDED"),
+    (message) => isUnacknowledged(message) || (message.period === game.currentPeriod && message.status === "UNREAD"),
+  );
+
+/**
+ * A decision request may stay open while the student explores the plan, but
+ * the week cannot be simulated before it is answered.
+ */
+export const hasOpenBlockingMessage = (game: GameState): boolean =>
+  game.inboxMessages.some(
+    (message) => (message.decisionRequired && message.status !== "RESPONDED") || isUnacknowledged(message),
   );
 
 /**
@@ -52,10 +73,16 @@ export const canPerform = (
   action: GameAction,
   versionId?: string,
 ): TransitionCheck => {
+  if (game.whatIf && WHAT_IF_BLOCKED.includes(action)) {
+    return { allowed: false, reasonKey: "whatIf.notAllowed" };
+  }
+  if (game.gameStatus === "PLANNING_DIRTY" && (action === "COMMIT_PLAN" || action === "SIMULATE_PERIOD")) {
+    return { allowed: false, reasonKey: "guard.planStale" };
+  }
   if (!TRANSITIONS[action].includes(game.gameStatus)) {
     return { allowed: false, reasonKey: `guard.invalidState.${action}` };
   }
-  if (action === "EVENTS_HANDLED" && hasOpenBlockingMessage(game)) {
+  if (action === "EVENTS_HANDLED" && hasUnhandledMessages(game)) {
     return { allowed: false, reasonKey: "guard.openMessages" };
   }
   if (action === "COMMIT_PLAN") {
@@ -91,11 +118,7 @@ export const nextStatus = (game: GameState, action: GameAction): GameStatus => {
     case "START_GAME":
       return "PERIOD_START";
     case "START_PERIOD":
-      return game.inboxMessages.some(
-        (message) => message.period === game.currentPeriod && message.status === "UNREAD",
-      )
-        ? "EVENTS_PENDING"
-        : "ANALYSIS";
+      return hasUnhandledMessages(game) ? "EVENTS_PENDING" : "ANALYSIS";
     case "EVENTS_HANDLED":
       return "ANALYSIS";
     case "CHANGE_PLAN":
@@ -112,6 +135,10 @@ export const nextStatus = (game: GameState, action: GameAction): GameStatus => {
       return "PERIOD_START";
   }
 };
+
+/** Status after NEXT_PERIOD, given the game length. */
+export const statusAfterPeriod = (period: number, gameLengthPeriods: number): GameStatus =>
+  period >= gameLengthPeriods ? "GAME_COMPLETED" : "PERIOD_START";
 
 export class InvalidTransitionError extends Error {
   constructor(

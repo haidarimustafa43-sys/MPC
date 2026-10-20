@@ -15,7 +15,8 @@ export type ConstraintType =
   | "PLAN_NOT_RECALCULATED"
   | "FROZEN_ZONE_VIOLATION"
   | "UNCOMMITTED_CHANGES"
-  | "RELEASE_DUE";
+  | "RELEASE_DUE"
+  | "DECISION_PENDING";
 
 export interface ConstraintViolation {
   id: string;

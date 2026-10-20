@@ -85,12 +85,12 @@
       "messageType": "CRITICAL_DISRUPTION",
       "title": { "en": "Machine breakdown at WC200", "sv": "Maskinhaveri i WC200" },
       "body": {
-        "en": "A press in sub-assembly WC200 has broken down. Available capacity is reduced by 40 % in periods 4 and 5.",
-        "sv": "En press i förmontering WC200 har gått sönder. Tillgänglig kapacitet minskar med 40 % i period 4 och 5."
+        "en": "A press in sub-assembly WC200 has broken down. Available capacity is reduced by 40 % in periods 4 to 6.",
+        "sv": "En press i förmontering WC200 har gått sönder. Tillgänglig kapacitet minskar med 40 % i period 4 till 6."
       }
     },
-    "effects": [{ "type": "CHANGE_CAPACITY", "workCenterId": "WC200", "factor": 0.6, "fromPeriod": 4, "toPeriod": 5 }],
-    "durationPeriods": 2,
+    "effects": [{ "type": "CHANGE_CAPACITY", "workCenterId": "WC200", "factor": 0.6, "fromPeriod": 4, "toPeriod": 6 }],
+    "durationPeriods": 3,
     "acknowledgementRequired": true,
     "decisionRequired": false
   }

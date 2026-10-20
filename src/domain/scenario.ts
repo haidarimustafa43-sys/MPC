@@ -23,6 +23,18 @@ export interface ScenarioSettings {
   allowPartialProduction: boolean;
   expressDelivery?: { costPerUnit: number; leadTimeReductionPeriods: number };
   externalCapacity?: { costPerHour: number; maxHoursPerPeriod: number };
+  /** Students may change the forecast for periods after the demand time fence. */
+  forecastEditable?: boolean;
+  /** Weights of the illustrative total score (see README); not a grade. */
+  scoring?: ScoringSettings;
+}
+
+export interface ScoringSettings {
+  deliveryWeight: number;
+  financialWeight: number;
+  planAdherenceWeight: number;
+  /** Net contribution per week that gives full financial points. */
+  referenceNetContributionPerPeriod: number;
 }
 
 export interface ScenarioMeta {

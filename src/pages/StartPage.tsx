@@ -1,9 +1,11 @@
 import { useState } from "react";
 import type { Language } from "../domain/common";
 import { localize } from "../i18n";
-import { loadScenario, scenarioIds } from "../scenarios";
+import { openInstructorReview } from "../app/navigation";
+import { builtInScenarioIds, isBuiltInScenario, loadScenario, scenarioAsJson } from "../scenarios";
 import { useGameStore } from "../state/gameStore";
 import { useT } from "../state/selectors";
+import { downloadText, readFileText } from "../utils/download";
 
 export function StartPage() {
   const t = useT();
@@ -16,10 +18,15 @@ export function StartPage() {
   const renameSave = useGameStore((state) => state.renameSave);
   const duplicateSave = useGameStore((state) => state.duplicateSave);
   const deleteSave = useGameStore((state) => state.deleteSave);
-  const ids = scenarioIds();
+  const notice = useGameStore((state) => state.notice);
+  const customIds = useGameStore((state) => state.customScenarioIds);
+  const importGameFile = useGameStore((state) => state.importGameFile);
+  const importScenarioFile = useGameStore((state) => state.importScenarioFile);
+  const removeCustomScenario = useGameStore((state) => state.removeCustomScenario);
+  const ids = [...builtInScenarioIds(), ...customIds];
   const [teamName, setTeamName] = useState("");
   const [scenarioId, setScenarioId] = useState(ids[0] ?? "");
-  const scenario = scenarioId ? loadScenario(scenarioId) : null;
+  const scenario = scenarioId && ids.includes(scenarioId) ? loadScenario(scenarioId) : loadScenario(ids[0]);
 
   return (
     <div className="start-page">
@@ -42,12 +49,17 @@ export function StartPage() {
           {error}
         </div>
       )}
+      {notice && (
+        <div className="banner info" role="status">
+          {notice}
+        </div>
+      )}
 
       <form
         className="card"
         onSubmit={(event) => {
           event.preventDefault();
-          void newGame(teamName, scenarioId);
+          void newGame(teamName, scenario.id);
         }}
       >
         <h2>{t("start.title")}</h2>
@@ -64,10 +76,11 @@ export function StartPage() {
           </label>
           <label className="field">
             {t("start.scenario")}
-            <select value={scenarioId} onChange={(event) => setScenarioId(event.target.value)}>
+            <select value={scenario.id} onChange={(event) => setScenarioId(event.target.value)}>
               {ids.map((id) => (
                 <option key={id} value={id}>
                   {localize(loadScenario(id).name, language)}
+                  {isBuiltInScenario(id) ? "" : ` (${t("io.custom")})`}
                 </option>
               ))}
             </select>
@@ -76,7 +89,17 @@ export function StartPage() {
             {t("action.newGame")}
           </button>
         </div>
-        {scenario && <p className="muted" style={{ marginTop: "0.75rem" }}>{localize(scenario.description, language)}</p>}
+        <p className="muted" style={{ marginTop: "0.75rem" }}>
+          {localize(scenario.description, language)}
+        </p>
+        <p className="muted small">
+          {t("io.preview", {
+            weeks: scenario.settings.gameLengthPeriods,
+            items: scenario.items.length,
+            workCenters: scenario.workCenters.length,
+            events: scenario.events.length,
+          })}
+        </p>
         <p className="muted small">{t("start.storageNote")}</p>
       </form>
 
@@ -135,6 +158,67 @@ export function StartPage() {
             </table>
           </div>
         )}
+      </section>
+      <section className="card">
+        <h2>{t("io.files")}</h2>
+        <div className="grid cols-2">
+          <div>
+            <h3>{t("io.importGame")}</h3>
+            <p className="muted small">{t("io.importGameHelp")}</p>
+            <input
+              type="file"
+              accept=".mpcgame,application/json"
+              aria-label={t("io.importGame")}
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (file) await importGameFile(await readFileText(file));
+                event.target.value = "";
+              }}
+            />
+          </div>
+          <div>
+            <h3>{t("io.importScenario")}</h3>
+            <p className="muted small">{t("io.importScenarioHelp")}</p>
+            <input
+              type="file"
+              accept=".json,application/json"
+              aria-label={t("io.importScenario")}
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (file && (await importScenarioFile(await readFileText(file)))) setScenarioId("");
+                event.target.value = "";
+              }}
+            />
+            <div className="row" style={{ marginTop: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => downloadText("standard-scenario.json", scenarioAsJson("standard"), "application/json")}
+              >
+                {t("io.downloadTemplate")}
+              </button>
+            </div>
+            {customIds.length > 0 && (
+              <ul>
+                {customIds.map((id) => (
+                  <li key={id} className="row">
+                    {id}
+                    <button type="button" className="link" onClick={() => void removeCustomScenario(id)}>
+                      {t("action.delete")}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>{t("instructor.title")}</h2>
+        <p className="muted small">{t("instructor.intro")}</p>
+        <button type="button" onClick={openInstructorReview}>
+          {t("instructor.open")}
+        </button>
       </section>
     </div>
   );

@@ -1,23 +1,9 @@
 import { useState } from "react";
 import { ViolationList } from "../components/common/ViolationList";
-import type { KpiResult } from "../domain/kpi";
-import { compareVersions } from "../engine/planning/compareVersions";
+import { VersionComparison } from "../components/planning/VersionComparison";
 import { useGameStore } from "../state/gameStore";
 import { useT } from "../state/selectors";
-import { formatMoney, formatNumber, formatPercent } from "../utils/format";
-
-const MONEY: (keyof KpiResult)[] = [
-  "revenue",
-  "materialCost",
-  "orderCost",
-  "holdingCost",
-  "overtimeCost",
-  "expediteCost",
-  "externalCapacityCost",
-  "lateOrderCost",
-  "netContribution",
-  "averageInventoryValue",
-];
+import { formatMoney, formatPercent } from "../utils/format";
 
 export function PlanningVersionsPage() {
   const t = useT();
@@ -31,12 +17,6 @@ export function PlanningVersionsPage() {
   const a = game.planningVersions.find((v) => v.id === (pick.a ?? defaultA));
   const b = game.planningVersions.find((v) => v.id === (pick.b ?? defaultB));
   const detail = game.planningVersions.find((v) => v.id === (pick.detail ?? defaultB));
-  const format = (kpi: keyof KpiResult, value: number) =>
-    MONEY.includes(kpi)
-      ? formatMoney(value, scenario.settings.currency)
-      : kpi === "serviceLevel"
-        ? formatPercent(value)
-        : formatNumber(value, kpi === "overloadHours" ? 1 : 0);
 
   return (
     <>
@@ -75,9 +55,12 @@ export function PlanningVersionsPage() {
                       <td>{formatMoney(version.projectedKpis.netContribution, scenario.settings.currency)}</td>
                       <td>{formatPercent(version.projectedKpis.serviceLevel)}</td>
                       <td className="left">
-                        {version.id === game.committedPlanVersionId && (
-                          <span className="badge ok">{t("versions.committed")}</span>
-                        )}
+                        <div className="row">
+                          {version.id === game.committedPlanVersionId && (
+                            <span className="badge ok">{t("versions.committed")}</span>
+                          )}
+                          {version.origin === "WHAT_IF" && <span className="badge whatif">{t("mode.whatIf")}</span>}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -116,37 +99,7 @@ export function PlanningVersionsPage() {
               </div>
             </div>
             {a && b && a.id !== b.id ? (
-              <>
-                <p className="muted small">{t("versions.note")}</p>
-                <div className="table-scroll">
-                  <table className="data">
-                    <thead>
-                      <tr>
-                        <th scope="col">{t("versions.kpi")}</th>
-                        <th scope="col">{a.id}</th>
-                        <th scope="col">{b.id}</th>
-                        <th scope="col" className="left">
-                          {t("versions.compareTitle", { a: a.id, b: b.id })}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compareVersions(a, b).map((delta) => (
-                        <tr key={delta.kpi}>
-                          <td>{t(`kpi.${delta.kpi}`)}</td>
-                          <td>{format(delta.kpi, delta.before)}</td>
-                          <td>{format(delta.kpi, delta.after)}</td>
-                          <td className="left">
-                            {delta.change === "BETTER" && <span className="delta-better">▲ {t("versions.better")}</span>}
-                            {delta.change === "WORSE" && <span className="delta-worse">▼ {t("versions.worse")}</span>}
-                            {delta.change === "SAME" && <span className="muted">= {t("versions.same")}</span>}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+              <VersionComparison before={a} after={b} currency={scenario.settings.currency} />
             ) : (
               <p className="muted">{t("versions.selectTwo")}</p>
             )}

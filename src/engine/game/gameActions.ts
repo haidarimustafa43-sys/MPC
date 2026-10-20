@@ -12,9 +12,11 @@ import type { Scenario } from "../../domain/scenario";
 import type { PlanningInput } from "../planningInput";
 import { applyPlanningParameters, horizonPeriods } from "../planningInput";
 import { runPlanning } from "../planning/runPlanning";
-import { transition } from "./stateMachine";
+import { processEvents } from "../events/processEvents";
+import { GameActionError } from "./errors";
+import { hasUnhandledMessages, transition } from "./stateMachine";
 
-export const SAVE_FILE_VERSION = 1;
+export const SAVE_FILE_VERSION = 2;
 
 declare const __APP_VERSION__: string | undefined;
 export const APPLICATION_VERSION: string =
@@ -85,6 +87,7 @@ export const createGameState = (scenario: Scenario, options: NewGameOptions): Ga
     planningParameters: initialPlanningParameters(scenario),
     workCenterCapacity: [],
     activeEventEffects: [],
+    scheduledEffects: [],
     inboxMessages: [],
     eventHistory: [],
     decisions: [],
@@ -99,11 +102,20 @@ export const createGameState = (scenario: Scenario, options: NewGameOptions): Ga
   return { ...game, gameStatus: transition(game, "START_GAME") };
 };
 
-export const startPeriod = (game: GameState, now: string): GameState => ({
-  ...game,
-  gameStatus: transition(game, "START_PERIOD"),
-  updatedAt: now,
-});
+/**
+ * Starts the week: runs the event engine (scheduled effects, triggered events),
+ * delivers messages and moves to EVENTS_PENDING when there is news to read.
+ * The plan is not recalculated automatically.
+ */
+export const startPeriod = (game: GameState, scenario: Scenario, now: string, entropy = 0): GameState => {
+  transition(game, "START_PERIOD");
+  const withEvents = processEvents(game, scenario, "PERIOD_START", game.currentPeriod, entropy);
+  return {
+    ...withEvents,
+    gameStatus: hasUnhandledMessages(withEvents) ? "EVENTS_PENDING" : "ANALYSIS",
+    updatedAt: now,
+  };
+};
 
 export const buildPlanningInput = (scenario: Scenario, game: GameState): PlanningInput => ({
   currentPeriod: game.currentPeriod,
@@ -116,6 +128,7 @@ export const buildPlanningInput = (scenario: Scenario, game: GameState): Plannin
   forecast: game.forecast,
   customerOrders: game.customerOrders,
   releasedOrders: game.releasedOrders,
+  firmPlannedOrders: game.plannedOrders,
   inventory: game.inventory,
   capacityAdjustments: game.workCenterCapacity,
   settings: scenario.settings,
@@ -124,19 +137,43 @@ export const buildPlanningInput = (scenario: Scenario, game: GameState): Plannin
 const currentIteration = (game: GameState): number =>
   game.planningVersions.filter((version) => version.period === game.currentPeriod).length;
 
-const recordDecision = (
+const decisionRecordFor = (
   game: GameState,
   decision: Omit<DecisionRecord, "id" | "period" | "iteration">,
+): DecisionRecord => ({
+  ...decision,
+  id: `D-${game.currentPeriod}-${game.decisions.length + 1}`,
+  period: game.currentPeriod,
+  iteration: currentIteration(game) + 1,
+});
+
+/** Adds an entry to the decision log without changing the plan (e.g. a discarded what-if). */
+export const logDecision = (
+  game: GameState,
+  decision: Omit<DecisionRecord, "id" | "period" | "iteration">,
+): GameState => ({
+  ...game,
+  decisions: [...game.decisions, decisionRecordFor(game, decision)],
+  updatedAt: decision.timestamp,
+});
+
+/**
+ * Logs a decision and marks the plan as changed. Answering a message is also
+ * allowed while the week's messages are being read (EVENTS_PENDING).
+ */
+export const recordDecision = (
+  game: GameState,
+  decision: Omit<DecisionRecord, "id" | "period" | "iteration">,
+  options: { allowWhileReadingMessages?: boolean } = {},
 ): GameState => {
-  const record: DecisionRecord = {
-    ...decision,
-    id: `D-${game.currentPeriod}-${game.decisions.length + 1}`,
-    period: game.currentPeriod,
-    iteration: currentIteration(game) + 1,
-  };
+  const record = decisionRecordFor(game, decision);
+  const status =
+    options.allowWhileReadingMessages && game.gameStatus === "EVENTS_PENDING"
+      ? game.gameStatus
+      : transition(game, "CHANGE_PLAN");
   return {
     ...game,
-    gameStatus: transition(game, "CHANGE_PLAN"),
+    gameStatus: status,
     decisions: [...game.decisions, record],
     pendingDecisionIds: [...game.pendingDecisionIds, record.id],
     updatedAt: decision.timestamp,
@@ -173,6 +210,46 @@ export const updatePlanningParameters = (
     });
   }
   return next;
+};
+
+/**
+ * Changes the forecast of an end item for one period. Only possible when the
+ * scenario allows it and only outside the demand time fence, where forecast
+ * drives the plan.
+ */
+export const updateForecast = (
+  game: GameState,
+  scenario: Scenario,
+  itemId: string,
+  period: number,
+  quantity: number,
+  now: string,
+  reason?: string,
+): GameState => {
+  if (!scenario.settings.forecastEditable) throw new GameActionError("forecast.notEditable");
+  const firstEditable = game.currentPeriod + scenario.settings.demandTimeFencePeriods;
+  if (period < firstEditable) throw new GameActionError("forecast.insideFence", { period: firstEditable });
+  const value = Math.round(quantity);
+  if (!Number.isFinite(value) || value < 0) throw new GameActionError("orders.invalidQuantity");
+  const existing = game.forecast.find((entry) => entry.itemId === itemId && entry.period === period);
+  const previous = existing?.quantity ?? 0;
+  if (previous === value) return game;
+  const forecast = existing
+    ? game.forecast.map((entry) => (entry === existing ? { ...entry, quantity: value } : entry))
+    : [...game.forecast, { itemId, period, quantity: value }];
+  return recordDecision(
+    { ...game, forecast },
+    {
+      timestamp: now,
+      category: "FORECAST_CHANGE",
+      entityType: "ITEM",
+      entityId: `${itemId}@${period}`,
+      field: "forecast",
+      previousValue: previous,
+      newValue: value,
+      reason,
+    },
+  );
 };
 
 export const setCapacityAdjustment = (
@@ -220,6 +297,7 @@ const snapshotOf = (game: GameState): PlanningInputSnapshot => ({
   inventory: structuredClone(game.inventory),
   customerOrders: structuredClone(game.customerOrders),
   releasedOrders: structuredClone(game.releasedOrders),
+  firmPlannedOrders: structuredClone(game.plannedOrders),
 });
 
 /** Runs MPS → MRP → CRP → constraints → KPIs and stores an immutable planning version. */
@@ -245,6 +323,7 @@ export const runPlanningVersion = (game: GameState, scenario: Scenario, now: str
     rccpResult: result.rccp,
     violations: result.violations,
     projectedKpis: result.kpis,
+    ...(game.whatIf ? { origin: "WHAT_IF" as const } : {}),
   };
   return {
     ...game,
@@ -262,17 +341,37 @@ export const commitPlan = (game: GameState, versionId: string, now: string): Gam
   updatedAt: now,
 });
 
-/** Restores the planning parameters and capacity decisions of the committed (or latest) version. */
+/**
+ * Restores the planning parameters, firm planned orders and overtime/external
+ * capacity of the committed (or latest) version of this week. Capacity
+ * factors set by events are kept: they are facts, not decisions.
+ */
 export const resetWorkingPlan = (game: GameState, now: string): GameState => {
   const reference =
-    game.planningVersions.find((v) => v.id === game.committedPlanVersionId) ??
-    game.planningVersions.filter((v) => v.period === game.currentPeriod).at(-1);
+    game.planningVersions.find((v) => v.id === game.committedPlanVersionId && v.period === game.currentPeriod) ??
+    latestVersion(game);
   if (!reference) return game;
+  const snapshotCapacity = reference.inputSnapshot.workCenterCapacity;
+  const factors = game.workCenterCapacity.filter((entry) => entry.capacityFactor !== 1);
+  const keys = new Set([...snapshotCapacity, ...factors].map((e) => `${e.workCenterId}@${e.period}`));
+  const workCenterCapacity = [...keys].map((key) => {
+    const [workCenterId, period] = [key.split("@")[0], Number(key.split("@")[1])];
+    const decided = snapshotCapacity.find((e) => e.workCenterId === workCenterId && e.period === period);
+    const current = game.workCenterCapacity.find((e) => e.workCenterId === workCenterId && e.period === period);
+    return {
+      workCenterId,
+      period,
+      capacityFactor: current?.capacityFactor ?? 1,
+      overtimeHours: decided?.overtimeHours ?? 0,
+      externalHours: decided?.externalHours ?? 0,
+    };
+  });
   return recordDecision(
     {
       ...game,
       planningParameters: structuredClone(reference.inputSnapshot.planningParameters),
-      workCenterCapacity: structuredClone(reference.inputSnapshot.workCenterCapacity),
+      workCenterCapacity,
+      plannedOrders: structuredClone(reference.inputSnapshot.firmPlannedOrders ?? []),
     },
     {
       timestamp: now,

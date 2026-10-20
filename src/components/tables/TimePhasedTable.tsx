@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from "react";
 import { formatQuantity } from "../../utils/format";
+import { CommitNumberInput } from "../common/CommitNumberInput";
 
 export interface TimePhasedRow {
   key: string;
@@ -14,6 +15,9 @@ export interface TimePhasedRow {
   /** Row name in the calculation traces, e.g. "net"; makes cells clickable. */
   traceRow?: string;
   tooltip?: (index: number) => string | undefined;
+  /** Cells the student may change directly (e.g. forecast outside the time fence). */
+  editable?: (index: number) => boolean;
+  onEdit?: (index: number, value: number) => void;
 }
 
 interface Props {
@@ -79,6 +83,19 @@ export function TimePhasedTable({
               {showNow && <td>{row.initial !== undefined ? formatQuantity(row.initial) : ""}</td>}
               {row.values.map((value, index) => {
                 const period = periods[index];
+                if (row.editable?.(index) && row.onEdit) {
+                  return (
+                    <td key={period} className="input manual-edit">
+                      <CommitNumberInput
+                        value={value ?? 0}
+                        min={0}
+                        max={1_000_000}
+                        ariaLabel={`${row.label}, ${periodLabel} ${period}`}
+                        onCommit={(next) => row.onEdit?.(index, next)}
+                      />
+                    </td>
+                  );
+                }
                 const clickable =
                   !!row.traceRow && !!onCellClick && (hasTrace?.(row.traceRow, period) ?? false);
                 const isSelected = selected?.row === row.traceRow && selected?.period === period;

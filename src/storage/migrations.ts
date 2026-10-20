@@ -14,7 +14,29 @@ type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
  * migrations[n] upgrades a save from version n to n + 1. Add an entry here
  * whenever GameState changes shape, and bump SAVE_FILE_VERSION.
  */
-const migrations: Record<number, Migration> = {};
+const migrations: Record<number, Migration> = {
+  // v1 → v2 (phase 3): scheduled event effects, firm planned orders in planning
+  // snapshots and firm-order markers in MRP records.
+  1: (state) => ({
+    ...state,
+    scheduledEffects: Array.isArray(state.scheduledEffects) ? state.scheduledEffects : [],
+    planningVersions: (Array.isArray(state.planningVersions) ? state.planningVersions : []).map(
+      (version: Record<string, unknown>) => {
+        const snapshot = (version.inputSnapshot ?? {}) as Record<string, unknown>;
+        const withMarkers = (result: unknown) => {
+          const records = ((result ?? {}) as { records?: Record<string, unknown>[] }).records ?? [];
+          return { ...(result as object), records: records.map((r) => ({ firmPeriods: [], ...r })) };
+        };
+        return {
+          ...version,
+          inputSnapshot: { firmPlannedOrders: [], ...snapshot },
+          mpsResult: withMarkers(version.mpsResult),
+          mrpResult: withMarkers(version.mrpResult),
+        };
+      },
+    ),
+  }),
+};
 
 const REQUIRED_FIELDS: (keyof GameState)[] = [
   "saveFileVersion",

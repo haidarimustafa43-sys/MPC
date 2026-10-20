@@ -15,20 +15,36 @@ All application text is in English; a Swedish translation is included (Settings 
 
 ## Status
 
-| Phase | Content | Status |
-| --- | --- | --- |
-| 1 – Foundation | Project structure, GitHub Pages config, domain model, scenario loading + validation, GameState, IndexedDB storage, navigation, dashboard | ✅ done |
-| 2 – Planning | BOM explosion, MPS, MRP, lot sizing, ATP, CRP, RCCP, constraint engine, planning versions + comparison | ✅ done |
-| 3 – Game loop | Inbox, pop-ups, event engine, decision log UI, commit → **simulate week** → review | ⏳ next (event data already in the scenario) |
-| 4 – Pedagogy | Calculation traces / explanation panel (basic version done), what-if mode, reports | partly |
-| 5 – Distribution | Export/import `.mpcgame`, Instructor Review | ⏳ |
+All five phases of the specification are implemented:
 
-What a student can do today: start a game, start week 1, run planning, inspect MPS / MRP /
-CRP / RCCP / inventory / orders, click calculated cells for an explanation, change safety
-stock, safety lead time, lot-sizing method and parameters, supplier, overtime and external
-capacity (each change is logged with an optional reason), rerun planning, compare planning
-versions KPI by KPI, and commit the plan. The game is saved automatically in the browser.
-"Simulate week" is visible but disabled until phase 3.
+| Phase | Content |
+| --- | --- |
+| 1 – Foundation | Project structure, GitHub Pages configuration, domain model, scenario loading and validation, GameState, IndexedDB storage, navigation, dashboard |
+| 2 – Planning | BOM explosion, MPS, MRP, lot sizing, ATP, CRP, RCCP, constraint engine |
+| 3 – Game loop | Event engine, inbox and pop-ups, order decisions, decision log, planning versions, commit → simulate week → week review → next week |
+| 4 – Pedagogy | Calculation traces and explanation panel, detailed plan comparison, what-if planning, reports with KPI history and a transparent score |
+| 5 – Distribution | `.mpcgame` export/import, CSV/JSON exports, Instructor Review, scenario import and JSON Schema, GitHub Actions |
+
+### What students do
+
+Each week the student starts the week and receives the events (critical news and decision
+requests open as a dialog and are kept in the Inbox), acknowledges or answers them, runs
+planning and inspects MPS / MRP / CRP / RCCP / inventory / orders. Every calculated cell can
+be clicked for an explanation generated from the calculation itself. The student changes
+safety stock, safety lead time, lot sizing, supplier, overtime, external capacity, forecast
+(outside the time fence) and planned orders (release, move, change quantity, cancel, express
+delivery, accept/reject customer orders), can try ideas in a **what-if plan** first, reruns
+and compares planning versions, commits a plan and simulates the week. The week review shows
+the realised outcome against the plan; Reports show the development over all weeks. Every
+decision is logged with an optional reason, and the game is saved automatically in the
+browser and can be exported as a file for the teacher.
+
+### What teachers do
+
+Teachers load the students' exported `.mpcgame` files in **Instructor Review** (locally, no
+upload) to compare KPIs, decisions with reasons, events and planning iterations per team.
+They can create their own scenarios as JSON (template download, JSON Schema, validation) and
+import them in the browser.
 
 ## Running locally
 
@@ -42,6 +58,7 @@ npm run typecheck  # strict TypeScript
 npm run lint
 npm run build      # type check + production build into dist/
 npm run preview    # serve the production build
+npm run schema     # regenerate public/scenario.schema.json after schema changes
 ```
 
 ## Publishing on GitHub Pages
@@ -72,7 +89,8 @@ Scenario JSON is bundled at build time, so no runtime request depends on the bas
 src/
   app/            App, router (HashRouter)
   components/     layout, common (badges, lists), tables, charts, planning (record view, explanation, parameter form)
-  pages/          Start, Dashboard, MPS, MRP, Capacity, Inventory, Orders, Planning versions, Master data, Settings
+  pages/          Start, Dashboard, Inbox, MPS, MRP, Capacity, Inventory, Orders, Planning versions,
+                  Week results, Decision log, Reports, Master data, Settings, Instructor review
   domain/         Pure TypeScript types (Item, BomLine, RoutingOperation, WorkCenter, Supplier, orders, events, GameState, PlanningVersion, KPIs, constraints)
   engine/
     planningInput.ts          builds the pure planning input (parameters applied)
@@ -81,12 +99,17 @@ src/
     capacity/                 capacityAvailability, calculateCrp, calculateRccp
     inventory/                time-phasing of scheduled receipts and customer demand
     constraints/              evaluateConstraints
-    scoring/                  calculateKpis
+    events/                   triggers, effects, seeded rolls, processEvents
+    simulation/               receiveOrders, completeProduction, fulfillCustomerOrders, simulateWeek
+    scoring/                  projected KPIs, realised totals, score, game summary
     planning/                 runPlanning (MPS → MRP → CRP/RCCP → constraints → KPIs), compareVersions
-    game/                     stateMachine (weekly flow), gameActions (pure GameState transitions)
-  state/          Zustand store (autosave, central error handling), selectors
-  storage/        IndexedDB (idb), save repository, migrations, localStorage preferences
-  scenarios/      standard/*.json, Zod schema, referential validation, registry
+    game/                     stateMachine, gameActions, orderActions, inboxActions, weekFlow, whatIf
+  importExport/   .mpcgame export, import validation, CSV/JSON exports
+  state/          Zustand store (autosave, what-if branch, central error handling), selectors
+  storage/        IndexedDB (idb): saves and custom scenarios, migrations, localStorage preferences
+  scenarios/      standard/*.json, Zod schema, JSON Schema, referential validation, registry
+scripts/          generateScenarioSchema.ts (npm run schema)
+public/           scenario.schema.json, favicon
   i18n/           en, sv
   tests/          fixtures, UI flow tests
 ```
@@ -144,8 +167,13 @@ A negative ATP is covered by the previous supply period. Forecast never consumes
 - Component gross requirement = parent planned order release × quantity per × (1 + scrap
   rate), rounded up per order, in the parent's release period. BOM effectivity windows refer
   to the parent's release period.
-- **Released production orders are assumed to have their material issued already**, so they
-  create no further component demand.
+- **Released production orders that have not started** still need their components: their
+  component quantities are a gross requirement in the current period (an allocation). Started
+  orders already have their material.
+- **Firm planned orders** (orders moved or changed by the student) are kept as they are and
+  exploded like other planned orders. Up to the latest firm order of an item, MRP does not add
+  orders of its own (firm zone), so moving an order later shows the gap instead of being
+  silently replanned.
 - Cyclic BOMs, unknown items, purchased parents and invalid quantities are reported as
   validation errors; a cyclic BOM blocks planning.
 
@@ -172,8 +200,8 @@ time, and its `unitCostModifiers[item]` multiplies the standard cost in material
 - Loaded orders: planned production orders and released production orders.
 - Operations are spread evenly over the order's lead time: operation k of n is loaded in
   `release + floor(k · leadTime / n)`.
-- Started (`IN_PROGRESS`) orders: operations scheduled before the current period are
-  treated as done. Released but not started orders: that work is loaded in the current period.
+- Finished operations (`completedOperations`, kept by the simulation) are not loaded.
+  Remaining work scheduled before the current period is loaded in the current period.
 - `available = normal × capacity factor (events) + overtime (capped at the limit) + external hours`.
 
 ### RCCP [`capacity/calculateRccp.ts`]
@@ -186,7 +214,8 @@ Projected inventory below zero, below safety stock, missing material (with the p
 that need it), late planned release (compressed safety lead time), release due now, past-due
 order, work-centre overload (with contributing orders), customer order at risk / late,
 supplier unavailable, invalid BOM, missing routing, plan not recalculated, plan not
-committed. Severity: INFO, WARNING, CRITICAL, BLOCKING (blocking = cannot commit).
+committed, firm planned order past its release date, firm order changed inside the frozen
+zone (`frozenZonePeriods`), and a message waiting for a decision. Severity: INFO, WARNING, CRITICAL, BLOCKING (blocking = cannot commit).
 
 ### Projected KPIs [`scoring/calculateKpis.ts`]
 Over the planning horizon:
@@ -208,10 +237,107 @@ used, because the trade-offs (e.g. safety stock vs. holding cost) are the point.
 
 `NOT_STARTED → PERIOD_START → (EVENTS_PENDING →) ANALYSIS → PLANNING_DIRTY ⇄ PLAN_CALCULATED → PLAN_COMMITTED → PERIOD_SIMULATED → PERIOD_REVIEW → PERIOD_START …`
 
-Guards: no planning before the week starts; no commit of a stale plan, an older version or a
-plan with blocking problems; no simulation with unanswered required messages, without a
-committed plan, or when the committed plan does not match the latest change. Invalid
-transitions throw and are shown as a readable message.
+Guards: no planning before the week's messages are read and the required ones acknowledged;
+no commit of a stale plan, an older version or a plan with blocking problems; no simulation
+with an unanswered decision request, without a committed plan, or when the committed plan
+does not match the latest change. A decision request may stay open while the student
+analyses the plan ("Review planning before deciding"). Invalid transitions throw and are
+shown as a readable message. After the last week the game is `GAME_COMPLETED`.
+
+## Order decisions [`engine/game/orderActions.ts`]
+
+- **Release**: planned orders whose release date has come (≤ current week) can be released.
+  Due period = max(planned receipt, today + lead time). The order cost is booked at release.
+  Releasing changes the plan, so planning has to be rerun before committing. Planned orders
+  that are due but not released do not happen; the week review lists them.
+- **Move earlier / later, change quantity**: creates a firm planned order. Its release
+  (receipt − lead time) may not lie in the past.
+- **Express delivery**: an open purchase order arrives `leadTimeReductionPeriods` earlier
+  (never before today) for `costPerUnit` × quantity, once per order.
+- **Accept / reject** proposed customer orders.
+
+## Week simulation [`engine/simulation/`]
+
+For the committed plan, in this order:
+1. Purchase orders due this week (after any delay) are received; material cost =
+   quantity × standard cost × supplier modifier.
+2. Production orders whose work is done and whose due week has come go into stock.
+3. Released orders whose release week has come get their components. An order starts only if
+   **all** components are available; otherwise it waits one week (material shortage).
+   Earlier due dates get material first. If the scenario sets `allowPartialProduction`, the
+   part that has material starts and the rest becomes a new order one week later.
+4. Operations scheduled up to this week are performed within the available capacity
+   (normal × event factor + overtime + external). Operations are not split: one that does not
+   fit delays its order by a week (capacity shortage). Earlier due dates first.
+5. Orders finished this week whose due week has come go into stock.
+6. Customer orders due up to this week are delivered from stock, oldest first; partial
+   deliveries are allowed. Anything still owed at the end of its due week is LATE.
+7. Costs and KPIs: revenue (delivered × price), material, order cost (booked at release),
+   holding (end stock × holding cost), overtime, external capacity, express, late cost
+   (units still owed × `lateCostPerUnitPeriod`, every week they are late), net contribution,
+   service level (order lines due this week delivered complete and on time).
+
+Each failure is labelled **"known problem in the committed plan"** when the plan already
+showed a matching problem (e.g. MISSING_MATERIAL for that item, WORK_CENTER_OVERLOAD for that
+work centre), otherwise **"not visible in the committed plan"**. The result is stored as an
+immutable `PeriodResult` (receipts, starts, completions, deliveries, failures, events,
+planned vs. actual stock, end inventory, KPIs).
+
+## What-if planning [`engine/game/whatIf.ts`]
+
+"Start what-if" copies the live game into a temporary branch. Everything the student does
+there (answer a request, change parameters, move orders, run planning) happens in the copy;
+the live game is not changed and not saved meanwhile. The branch can be compared with the
+live plan, then **applied** (it becomes the live game, its planning versions are marked
+WHAT-IF and one APPLY entry is logged) or **discarded** (only a DISCARD entry is logged).
+Committing, simulating and changing week are blocked inside a branch. The branch lives in
+memory only: reloading the page discards it.
+
+## Explanations and comparison
+
+- Clicking a calculated MPS/MRP cell opens an explanation built from the calculation trace:
+  net requirement, lot size (method and parameters), planned receipt, release (lead-time
+  offset), projected balance, MPS demand (time-fence rule), **gross requirements with pegging**
+  to the parent orders that cause them, and **ATP** with the periods it covers.
+- Comparing two planning versions shows, before the KPI table, the concrete problems: number
+  of warnings and critical problems, overload hours per work centre and largest shortage per
+  item (e.g. `Overload WC200: 14 h → 4 h`, `Projected shortage RM2: 80 → 0`). Each KPI is
+  marked better/worse on its own; no KPI is assumed to be the most important.
+
+## Reports and score [`engine/scoring/`]
+
+Reports show realised service level and net contribution per week (and cumulated), costs per
+week by type, inventory value and holding cost next to the service level (the safety-stock
+trade-off), the realised totals, and exports. The **total score** is illustrative and always
+shown with its parts and formulas; the weights are scenario data (`settings.scoring`):
+
+- delivery = `deliveryWeight × realised service level`;
+- financial = `financialWeight × min(1, net contribution / (referenceNetContributionPerPeriod × weeks))`;
+- plan adherence = `planAdherenceWeight × weeks without a failure that the committed plan
+  already showed / weeks`.
+
+It is meant for discussion, not grading.
+
+## Forecast changes
+
+If the scenario sets `forecastEditable`, the forecast cells of the MPS after the demand time
+fence are editable. Each change is a logged decision; inside the fence only customer orders
+count, so changes there are refused.
+
+## Event engine [`engine/events/`]
+
+At the start of each week: effects scheduled for this week (delayed effects, supplier
+recovery) and follow-up events are applied, then every event whose trigger matches fires.
+Period-end triggers run after the simulation. Each event fires at most once and only when its
+`prerequisites` have fired. Triggers: `PERIOD_START`, `PERIOD_END`, `PERIOD_RANGE`,
+`RANDOM`, `INVENTORY_BELOW`, `UTILIZATION_ABOVE` (committed plan of the previous week),
+`SERVICE_LEVEL_BELOW` (realised), `DECISION_TAKEN`.
+
+`probability` < 1 is decided by a seeded roll per event and week, according to the scenario's
+`eventMode`: `fixed` (same for all teams), `seeded` (reproducible per team via
+`randomSeed`) or `random` (new entropy each time). Effects only change conditions
+(purchase-order dates, capacity factors, customer orders, supplier availability, stock), so
+the same event hurts a team with low stock and not one that built safety stock.
 
 ## Scenario structure
 
@@ -228,41 +354,97 @@ Alpha and Customer Beta; open production and purchase orders; four events (welco
 customer request in week 2, RM2 delay in week 3, WC200 breakdown in week 4).
 
 ### Creating a new scenario
-1. Copy `src/scenarios/standard/` to a new folder and edit the JSON.
+
+**Without programming (in the browser):**
+1. Start page → **Download the standard scenario as a template** (`standard-scenario.json`).
+2. Edit it (give it a new `id`). `public/scenario.schema.json` (also published next to the
+   app) gives autocompletion and checks in editors such as VS Code:
+   add `"$schema": "./scenario.schema.json"` or associate the file in the editor.
+3. Start page → **Import a scenario (JSON)**. It is validated (schema plus referential checks:
+   unknown items/work centres/suppliers, duplicate ids, cyclic BOMs) and then selectable in this
+   browser. Exported games of custom scenarios carry the scenario, so the teacher can review them.
+
+**Built into the application:**
+1. Copy `src/scenarios/standard/` to a new folder and edit the JSON files.
 2. Register it in `src/scenarios/index.ts` (one entry in `rawScenarios`).
-3. Run `npm run test`: the scenario is validated with the Zod schema in
-   `src/scenarios/schema.ts` plus referential checks (unknown items, work centres,
-   suppliers, duplicate ids, cyclic BOMs). Errors name the exact path, e.g.
-   `items.0.lotSizingPolicy.quantity: Required`.
+3. Run `npm run test`. Errors name the exact path, e.g. `items.0.lotSizingPolicy.quantity: Required`.
+   After changing `src/scenarios/schema.ts`, run `npm run schema` to regenerate the JSON Schema
+   (a test fails if it is out of date).
 
 ### Event structure
 Events are data (`events.json`) with `trigger` (period start/end/range, state-based or
 random), `probability`, `message` (sender, severity, type, bilingual title/body), optional
 `choices`, `effects` (e.g. `DELAY_PURCHASE_ORDER`, `CHANGE_CAPACITY`,
-`CHANGE_CUSTOMER_ORDER_QUANTITY`), delayed effects and follow-ups. They are validated now;
-the event engine that applies them is phase 3. Effects change the planning conditions, never
-the result.
+`CHANGE_CUSTOMER_ORDER_QUANTITY`, `ADD_CUSTOMER_ORDER` with status ACCEPTED or PROPOSED,
+`SUPPLIER_UNAVAILABLE`, `SCRAP_INVENTORY`), delayed effects and follow-ups. A choice with
+`"defersDecision": true` keeps the request open. To add an event, append it to
+`events.json` and run `npm run test`; the schema reports mistakes.
 
-## Saved games
+In the standard scenario the events are tuned so that a planner who simply releases what MRP
+suggests still meets them: the RM2 delay (week 3) leaves RM2 short by about 50 units in
+period 4, and the WC200 breakdown (−40 % in periods 4–6) overloads WC200 by about 11 hours in
+period 6.
+
+## Saved games, export and import
 
 Games are stored automatically in **IndexedDB** in the student's browser (debounced
 autosave). The start page lists saved games and supports open, rename, duplicate and delete;
 Settings can restart the scenario. Only the language and the active game id are kept in
-`localStorage`. Each save carries `saveFileVersion`; `storage/migrations.ts` validates
-required fields, rejects newer or broken saves with a readable message and is where
-migrations for future versions go. Export/import as `.mpcgame` files follows in phase 5.
+`localStorage`. Each save carries `saveFileVersion`; `storage/migrations.ts` upgrades
+older saves (v1 → v2 is included) and rejects newer or broken ones with a readable message.
+
+### `.mpcgame` files [`importExport/`]
+
+Settings → **Export game** downloads the whole game as `<team>_<scenario>_week<n>.mpcgame`.
+Technically it is JSON:
+
+```json
+{
+  "format": "mpc-planning-game",
+  "schemaVersion": 1,
+  "exportedAt": "2026-10-16T12:00:00.000Z",
+  "applicationVersion": "1.0.0",
+  "scenarioId": "standard",
+  "scenarioVersion": "1.0.0",
+  "checksum": "1a2b3c4d",
+  "gameState": { "...": "the complete GameState" },
+  "scenario": { "...": "only for scenarios that are not built in" }
+}
+```
+
+The checksum (FNV-1a over the serialised game state) detects accidental damage or editing; it
+is not a security feature. Import (start page) only parses JSON, never executes anything,
+and checks size, format, schema version, required fields, checksum, scenario availability
+(built-in or embedded and valid), save migration and the structure of the game state. Errors
+are shown in plain language. An import never overwrites a game in the browser: a clashing id
+gets a new one.
+
+Reports → **Export data** gives KPI history, decision log, orders and inventory history as
+CSV, or everything as JSON.
+
+### Instructor Review
+
+Start page (or Settings) → **Open instructor review**. Select one or more `.mpcgame` files;
+they are read in the browser only and nothing is stored. The overview shows per team:
+scenario, final week, completed or not, service level, net contribution, holding and
+overtime cost, late orders, planning iterations, decisions and the illustrative score, plus
+comparison charts. The detail view lists major decisions with the students' reasons, events
+and answers, planning versions per week, decisions per category and the outcome of each week.
+There is no ranking and no automatic grade.
 
 ## Known limitations
 
-- Weeks cannot be simulated yet; the game stays in week 1 (phase 3).
-- No inbox or event engine yet; scenario events are validated but not triggered.
-- Planned orders cannot yet be moved, firmed or released manually; changes are made through
-  planning parameters, supplier choice and capacity.
-- MRP uses weekly buckets and integer rounding per order; no pegging view yet.
-- RCCP ignores setups and lead-time offset by design.
+- Supplier reliability is not simulated randomly; deliveries change only through events, so
+  every team meets the same conditions.
+- A what-if branch is kept in memory only; reloading the page discards it.
+- MRP uses weekly buckets and integer rounding per order; RCCP ignores setups and lead-time
+  offset by design.
+- Custom scenarios and saved games live in the browser where they were created (export files
+  move them).
+- The score is illustrative; it is not calibrated for grading.
 
 ## Planned improvements
 
-Phase 3 (inbox, pop-ups, event engine, order release/move, simulate week, week review),
-phase 4 (richer explanations, what-if branch, reports), phase 5 (export/import,
-Instructor Review, CSV export of histories).
+The application is complete according to the specification. The next step is feedback from
+the examiners who use it in their courses; typical extensions would be more scenarios, more
+event types, a visual scenario editor and additional languages.

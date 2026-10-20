@@ -36,6 +36,8 @@ export interface PlannedOrder {
   supplierId?: string;
   /** Safety lead time had to be compressed to release in time. */
   compressed: boolean;
+  /** Firm planned order: fixed by the student, MRP does not change it. */
+  firm?: boolean;
 }
 
 export type CellRisk = "OK" | "BELOW_SAFETY_STOCK" | "SHORTAGE";
@@ -64,6 +66,8 @@ export interface ItemPlanRecord {
   traces: Record<string, CalculationTrace>;
   /** Periods with net requirements that cannot be covered because they lie inside the lead time. */
   uncoveredPeriods: number[];
+  /** Receipt periods that contain a firm planned order (manually set values). */
+  firmPeriods: number[];
 }
 
 export interface MpsRecord extends ItemPlanRecord {
@@ -134,6 +138,7 @@ export interface PlanningInputSnapshot {
   inventory: InventoryBalance[];
   customerOrders: CustomerOrder[];
   releasedOrders: Order[];
+  firmPlannedOrders: PlannedOrder[];
 }
 
 export interface PlanningVersion {
@@ -149,4 +154,6 @@ export interface PlanningVersion {
   rccpResult: RccpResult;
   violations: ConstraintViolation[];
   projectedKpis: KpiResult;
+  /** Versions calculated in a what-if branch that was later applied. */
+  origin?: "WHAT_IF";
 }

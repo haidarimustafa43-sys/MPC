@@ -60,14 +60,48 @@ export const calculateMpsRecord = (input: PlanningInput, item: PlanningItem): Mp
     orderCost: item.orderCost,
     holdingCostPerUnitPeriod: item.holdingCostPerUnitPeriod,
     lowLevelCode: 0,
+    firmOrders: input.firmPlannedOrders.filter((order) => order.itemId === item.id),
+  });
+
+  const fenceEnd = input.currentPeriod + input.settings.demandTimeFencePeriods - 1;
+  input.periods.forEach((period, i) => {
+    record.traces[`gross:${period}`] = {
+      formula:
+        period <= fenceEnd
+          ? "total demand = customer orders (inside the demand time fence)"
+          : "total demand = max(forecast, customer orders)",
+      inputs: { forecast: forecast[i], customerOrders: orders[i], demandTimeFenceEndsInPeriod: fenceEnd },
+      result: demand[i],
+      explanationKey: period <= fenceEnd ? "mps.demandInsideFence" : "mps.demandOutsideFence",
+    };
   });
 
   const supply = record.plannedReceipts.map((value, i) => value + scheduled[i]);
+  const atp = calculateAtp(onHand, supply, orders);
+  atp.forEach((value, i) => {
+    if (value === null) return;
+    const nextSupply = atp.findIndex((candidate, j) => j > i && candidate !== null);
+    const end = nextSupply === -1 ? orders.length : nextSupply;
+    const committed = orders.slice(i, end).reduce((sum, quantity) => sum + quantity, 0);
+    record.traces[`atp:${input.periods[i]}`] = {
+      formula: "ATP = (on hand, first period only) + supply − customer orders until the next supply",
+      inputs: {
+        onHand: i === 0 ? onHand : 0,
+        supply: supply[i],
+        customerOrdersUntilNextSupply: committed,
+        coversPeriods: `${input.periods[i]}–${input.periods[end - 1]}`,
+      },
+      intermediateValues: { beforeBackwardNetting: (i === 0 ? onHand : 0) + supply[i] - committed },
+      result: value,
+      explanationKey: "mps.atp",
+    };
+  });
+
   return {
     ...record,
     forecast,
     customerOrders: orders,
-    atp: calculateAtp(onHand, supply, orders),
+    atp,
   };
 };
 

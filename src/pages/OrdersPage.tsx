@@ -2,23 +2,84 @@ import { useState } from "react";
 import { PlanStatusBanner } from "../components/common/PlanStatusBanner";
 import { ItemTabs } from "../components/planning/ItemTabs";
 import type { ProductionOrder, PurchaseOrder } from "../domain/order";
+import type { PlannedOrder } from "../domain/planningVersion";
+import { currentPlannedOrders, plannedOrdersDueForRelease } from "../engine/game/orderActions";
+import { canPerform } from "../engine/game/stateMachine";
 import { useGameStore } from "../state/gameStore";
-import { selectLatestVersion, useT } from "../state/selectors";
+import { useT } from "../state/selectors";
 import { formatQuantity } from "../utils/format";
 
 type Tab = "planned" | "released" | "purchase" | "customer";
+
+function PlannedOrderEditor({ order, onClose }: { order: PlannedOrder; onClose: () => void }) {
+  const t = useT();
+  const firmOrder = useGameStore((state) => state.firmOrder);
+  const [quantity, setQuantity] = useState(order.quantity);
+  const [receipt, setReceipt] = useState(order.receiptPeriod);
+  const [reason, setReason] = useState("");
+  return (
+    <form
+      className="card"
+      onSubmit={(event) => {
+        event.preventDefault();
+        firmOrder(order.id, { quantity, receiptPeriod: receipt }, reason.trim() || undefined);
+        onClose();
+      }}
+    >
+      <h3>{t("orders.editTitle", { order: order.id })}</h3>
+      <p className="muted small">{t("orders.editHelp")}</p>
+      <div className="form-row">
+        <label className="field">
+          {t("orders.quantity")}
+          <input type="number" min={1} value={quantity} onChange={(e) => setQuantity(Number(e.target.value) || 0)} />
+        </label>
+        <label className="field">
+          {t("orders.receipt")}
+          <input type="number" min={1} value={receipt} onChange={(e) => setReceipt(Number(e.target.value) || 0)} />
+        </label>
+        <label className="field" style={{ flex: 1, minWidth: 220 }}>
+          {t("plan.reason")}
+          <input type="text" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
+        </label>
+        <button type="submit" className="primary">
+          {t("action.apply")}
+        </button>
+        <button type="button" onClick={onClose}>
+          {t("action.cancel")}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 export function OrdersPage() {
   const t = useT();
   const game = useGameStore((state) => state.game);
   const scenario = useGameStore((state) => state.scenario);
+  const releaseOrder = useGameStore((state) => state.releaseOrder);
+  const releaseAllDue = useGameStore((state) => state.releaseAllDue);
+  const firmOrder = useGameStore((state) => state.firmOrder);
+  const cancelFirmOrder = useGameStore((state) => state.cancelFirmOrder);
+  const expedite = useGameStore((state) => state.expedite);
+  const decideCustomerOrder = useGameStore((state) => state.decideCustomerOrder);
   const [tab, setTab] = useState<Tab>("planned");
-  const version = selectLatestVersion(game);
+  const [editing, setEditing] = useState<PlannedOrder | null>(null);
   if (!game || !scenario) return null;
+
+  const editable = canPerform(game, "CHANGE_PLAN");
+  const disabledReason = editable.reasonKey ? t(editable.reasonKey) : undefined;
   const supplierName = (id?: string) => game.suppliers.find((s) => s.id === id)?.name ?? id ?? "";
-  const planned = (version?.mrpResult.records ?? []).flatMap((record) => record.plannedOrders);
+  const planned = [...currentPlannedOrders(game)].sort(
+    (a, b) => a.releasePeriod - b.releasePeriod || a.id.localeCompare(b.id),
+  );
+  const dueIds = new Set(plannedOrdersDueForRelease(game).map((order) => order.id));
   const released = game.releasedOrders.filter((o): o is ProductionOrder => o.kind === "PRODUCTION");
   const purchases = game.releasedOrders.filter((o): o is PurchaseOrder => o.kind === "PURCHASE");
+  const express = scenario.settings.expressDelivery;
+  const delayed = (order: { duePeriod: number; originalDuePeriod?: number }) =>
+    order.originalDuePeriod !== undefined && order.originalDuePeriod !== order.duePeriod ? (
+      <span className="badge warning">{t("orders.delayed", { period: order.originalDuePeriod })}</span>
+    ) : null;
 
   return (
     <>
@@ -26,18 +87,27 @@ export function OrdersPage() {
       <ItemTabs
         label={t("nav.orders")}
         items={[
-          { id: "planned", label: t("orders.planned") },
+          { id: "planned", label: t("orders.plannedTab"), flagged: dueIds.size > 0 },
           { id: "released", label: t("orders.released") },
           { id: "purchase", label: t("orders.purchase") },
-          { id: "customer", label: t("orders.customer") },
+          { id: "customer", label: t("orders.customer"), flagged: game.customerOrders.some((o) => o.status === "PROPOSED") },
         ]}
         selectedId={tab}
         onSelect={(id) => setTab(id as Tab)}
       />
-      <section className="card">
-        {tab === "planned" && (
-          <>
-            <PlanStatusBanner />
+      {tab === "planned" && (
+        <>
+          <PlanStatusBanner />
+          {editing && <PlannedOrderEditor key={editing.id} order={editing} onClose={() => setEditing(null)} />}
+          <section className="card">
+            <div className="card-header">
+              <h2>{t("orders.plannedTab")}</h2>
+              {dueIds.size > 0 && (
+                <button onClick={() => releaseAllDue()} disabled={!editable.allowed} title={disabledReason}>
+                  {t("action.releaseAllDue")} ({dueIds.size})
+                </button>
+              )}
+            </div>
             {planned.length === 0 ? (
               <p className="muted">{t("orders.none")}</p>
             ) : (
@@ -50,9 +120,9 @@ export function OrdersPage() {
                       <th scope="col" className="left">{t("orders.source")}</th>
                       <th scope="col">{t("orders.quantity")}</th>
                       <th scope="col">{t("orders.release")}</th>
-                      <th scope="col">{t("orders.due")}</th>
-                      <th scope="col" className="left">{t("orders.supplier")}</th>
+                      <th scope="col">{t("orders.receipt")}</th>
                       <th scope="col" className="left">{t("orders.status")}</th>
+                      <th scope="col" className="left">{t("orders.actions")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -60,13 +130,61 @@ export function OrdersPage() {
                       <tr key={order.id}>
                         <td>{order.id}</td>
                         <td className="left">{order.itemId}</td>
-                        <td className="left">{order.kind === "PURCHASE" ? t("orders.plannedPurchase") : t("orders.planned")}</td>
-                        <td>{formatQuantity(order.quantity)}</td>
-                        <td className={order.releasePeriod === game.currentPeriod ? "emphasis" : ""}>{order.releasePeriod}</td>
-                        <td>{order.receiptPeriod}</td>
-                        <td className="left">{supplierName(order.supplierId)}</td>
                         <td className="left">
-                          {order.compressed ? <span className="badge warning">{t("orders.compressed")}</span> : "PLANNED"}
+                          {order.kind === "PURCHASE"
+                            ? `${t("orders.plannedPurchase")} · ${supplierName(order.supplierId)}`
+                            : t("orders.planned")}
+                        </td>
+                        <td>{formatQuantity(order.quantity)}</td>
+                        <td className={dueIds.has(order.id) ? "emphasis" : ""}>{order.releasePeriod}</td>
+                        <td>{order.receiptPeriod}</td>
+                        <td className="left">
+                          <div className="row">
+                            {order.firm && <span className="badge mode">{t("orders.firm")}</span>}
+                            {dueIds.has(order.id) && <span className="badge info">{t("orders.dueNow")}</span>}
+                            {order.compressed && <span className="badge warning">{t("orders.compressed")}</span>}
+                          </div>
+                        </td>
+                        <td className="left actions">
+                          <div className="row">
+                            {dueIds.has(order.id) && (
+                              <button
+                                className="primary"
+                                disabled={!editable.allowed}
+                                title={disabledReason}
+                                onClick={() => releaseOrder(order.id)}
+                              >
+                                {t("action.release")}
+                              </button>
+                            )}
+                            <button
+                              disabled={!editable.allowed}
+                              title={disabledReason}
+                              onClick={() => firmOrder(order.id, { receiptPeriod: order.receiptPeriod - 1 })}
+                            >
+                              ◀ {t("action.earlier")}
+                            </button>
+                            <button
+                              disabled={!editable.allowed}
+                              title={disabledReason}
+                              onClick={() => firmOrder(order.id, { receiptPeriod: order.receiptPeriod + 1 })}
+                            >
+                              {t("action.later")} ▶
+                            </button>
+                            <button disabled={!editable.allowed} title={disabledReason} onClick={() => setEditing(order)}>
+                              {t("action.firm")}
+                            </button>
+                            {order.firm && (
+                              <button
+                                className="danger"
+                                disabled={!editable.allowed}
+                                title={disabledReason}
+                                onClick={() => cancelFirmOrder(order.id)}
+                              >
+                                {t("action.cancelFirm")}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -74,84 +192,167 @@ export function OrdersPage() {
                 </table>
               </div>
             )}
-          </>
-        )}
-        {tab === "released" && (
-          <OrderTable
-            headers={[t("orders.id"), t("orders.item"), t("orders.quantity"), t("orders.release"), t("orders.due"), t("orders.status")]}
-            rows={released.map((o) => [o.id, o.itemId, formatQuantity(o.quantity), o.releasePeriod, o.duePeriod, o.status])}
-            empty={t("orders.none")}
-          />
-        )}
-        {tab === "purchase" && (
-          <OrderTable
-            headers={[t("orders.id"), t("orders.item"), t("orders.quantity"), t("orders.release"), t("orders.due"), t("orders.supplier"), t("orders.status")]}
-            rows={purchases.map((o) => [
-              o.id,
-              o.itemId,
-              formatQuantity(o.quantity),
-              o.releasePeriod,
-              o.duePeriod,
-              supplierName(o.supplierId),
-              o.status,
-            ])}
-            empty={t("orders.none")}
-          />
-        )}
-        {tab === "customer" && (
-          <OrderTable
-            headers={[t("orders.id"), t("orders.customerName"), t("orders.item"), t("orders.quantity"), t("orders.due"), t("orders.price"), t("orders.status")]}
-            rows={game.customerOrders.map((o) => [
-              o.id,
-              o.customerName,
-              o.itemId,
-              formatQuantity(o.quantity),
-              o.duePeriod,
-              `${o.sellingPricePerUnit} ${scenario.settings.currency}`,
-              o.status,
-            ])}
-            empty={t("orders.none")}
-          />
-        )}
-      </section>
-    </>
-  );
-}
+          </section>
+        </>
+      )}
 
-function OrderTable({
-  headers,
-  rows,
-  empty,
-}: {
-  headers: string[];
-  rows: (string | number)[][];
-  empty: string;
-}) {
-  if (rows.length === 0) return <p className="muted">{empty}</p>;
-  return (
-    <div className="table-scroll">
-      <table className="data">
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th scope="col" key={header} className={typeof rows[0][headers.indexOf(header)] === "string" ? "left" : ""}>
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={String(row[0])}>
-              {row.map((cell, index) => (
-                <td key={index} className={typeof cell === "string" ? "left" : ""}>
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+      {tab === "released" && (
+        <section className="card">
+          {released.length === 0 ? (
+            <p className="muted">{t("orders.none")}</p>
+          ) : (
+            <div className="table-scroll">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th scope="col">{t("orders.id")}</th>
+                    <th scope="col" className="left">{t("orders.item")}</th>
+                    <th scope="col">{t("orders.quantity")}</th>
+                    <th scope="col">{t("orders.release")}</th>
+                    <th scope="col">{t("orders.due")}</th>
+                    <th scope="col">{t("orders.completedOps")}</th>
+                    <th scope="col" className="left">{t("orders.status")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {released.map((order) => (
+                    <tr key={order.id}>
+                      <td>{order.id}</td>
+                      <td className="left">{order.itemId}</td>
+                      <td>{formatQuantity(order.quantity)}</td>
+                      <td>{order.releasePeriod}</td>
+                      <td>{order.duePeriod}</td>
+                      <td>{order.completedOperations ?? "–"}</td>
+                      <td className="left">
+                        <div className="row">
+                          {order.status}
+                          {delayed(order)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === "purchase" && (
+        <section className="card">
+          {express && (
+            <p className="muted small">
+              {t("orders.expressHint", {
+                periods: express.leadTimeReductionPeriods,
+                cost: `${express.costPerUnit} ${scenario.settings.currency}`,
+              })}
+            </p>
+          )}
+          {purchases.length === 0 ? (
+            <p className="muted">{t("orders.none")}</p>
+          ) : (
+            <div className="table-scroll">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th scope="col">{t("orders.id")}</th>
+                    <th scope="col" className="left">{t("orders.item")}</th>
+                    <th scope="col">{t("orders.quantity")}</th>
+                    <th scope="col">{t("orders.release")}</th>
+                    <th scope="col">{t("orders.due")}</th>
+                    <th scope="col" className="left">{t("orders.supplier")}</th>
+                    <th scope="col" className="left">{t("orders.status")}</th>
+                    <th scope="col" className="left">{t("orders.actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.map((order) => (
+                    <tr key={order.id}>
+                      <td>{order.id}</td>
+                      <td className="left">{order.itemId}</td>
+                      <td>{formatQuantity(order.quantity)}</td>
+                      <td>{order.releasePeriod}</td>
+                      <td>{order.duePeriod}</td>
+                      <td className="left">{supplierName(order.supplierId)}</td>
+                      <td className="left">
+                        <div className="row">
+                          {order.status}
+                          {delayed(order)}
+                          {order.expedited && <span className="badge info">{t("orders.expedited")}</span>}
+                        </div>
+                      </td>
+                      <td className="left actions">
+                        {express && order.status === "RELEASED" && !order.expedited && (
+                          <button disabled={!editable.allowed} title={disabledReason} onClick={() => expedite(order.id)}>
+                            {t("action.expedite")}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === "customer" && (
+        <section className="card">
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th scope="col">{t("orders.id")}</th>
+                  <th scope="col" className="left">{t("orders.customerName")}</th>
+                  <th scope="col" className="left">{t("orders.item")}</th>
+                  <th scope="col">{t("orders.quantity")}</th>
+                  <th scope="col">{t("orders.delivered")}</th>
+                  <th scope="col">{t("orders.due")}</th>
+                  <th scope="col">{t("orders.price")}</th>
+                  <th scope="col" className="left">{t("orders.status")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {game.customerOrders.map((order) => (
+                  <tr key={order.id}>
+                    <td>{order.id}</td>
+                    <td className="left">{order.customerName}</td>
+                    <td className="left">{order.itemId}</td>
+                    <td>{formatQuantity(order.quantity)}</td>
+                    <td>{formatQuantity(order.deliveredQuantity ?? 0)}</td>
+                    <td>{order.duePeriod}</td>
+                    <td>
+                      {order.sellingPricePerUnit} {scenario.settings.currency}
+                    </td>
+                    <td className="left">
+                      {order.status === "PROPOSED" ? (
+                        <div className="row">
+                          <span className="badge warning">{t("orders.proposed")}</span>
+                          <button
+                            className="primary"
+                            disabled={!editable.allowed}
+                            onClick={() => decideCustomerOrder(order.id, true)}
+                          >
+                            {t("action.accept")}
+                          </button>
+                          <button disabled={!editable.allowed} onClick={() => decideCustomerOrder(order.id, false)}>
+                            {t("action.reject")}
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={`badge ${order.status === "LATE" ? "critical" : order.status === "FULFILLED" ? "ok" : "info"}`}>
+                          {order.status}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </>
   );
 }

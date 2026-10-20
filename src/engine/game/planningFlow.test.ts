@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameState } from "../../domain/gameState";
 import { loadScenario } from "../../scenarios";
-import { FIXED_TIME } from "../../tests/fixtures";
+import { FIXED_TIME, takeInMessages } from "../../tests/fixtures";
 import { compareVersions } from "../planning/compareVersions";
 import {
   buildPlanningInput,
@@ -17,12 +17,15 @@ import {
 
 const scenario = loadScenario("standard");
 const startedGame = (): GameState =>
-  startPeriod(
-    createGameState(scenario, { gameId: "g1", teamName: "Team 1", randomSeed: 7, now: FIXED_TIME }),
-    FIXED_TIME,
+  takeInMessages(
+    startPeriod(
+      createGameState(scenario, { gameId: "g1", teamName: "Team 1", randomSeed: 7, now: FIXED_TIME }),
+      scenario,
+      FIXED_TIME,
+    ),
   );
 
-/** Simulates the RM2 supplier delay by hand; the event engine arrives in phase 3. */
+/** Applies a supplier delay directly, to test planning in isolation from the event engine. */
 const delayPurchaseOrder = (game: GameState, orderId: string, periods: number): GameState => ({
   ...game,
   releasedOrders: game.releasedOrders.map((order) =>

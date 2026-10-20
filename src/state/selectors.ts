@@ -18,9 +18,9 @@ export const selectLatestVersion = (game: GameState | null): PlanningVersion | u
 export const isPlanStale = (game: GameState | null): boolean => !!game && game.pendingDecisionIds.length > 0;
 
 /** Plan violations of the latest version plus workflow problems from the game state. */
-export const currentViolations = (game: GameState | null): ConstraintViolation[] => {
+export const currentViolations = (game: GameState | null, frozenZonePeriods = 1): ConstraintViolation[] => {
   if (!game) return [];
-  return [...evaluateGameConstraints(game), ...(latestVersion(game)?.violations ?? [])];
+  return [...evaluateGameConstraints(game, frozenZonePeriods), ...(latestVersion(game)?.violations ?? [])];
 };
 
 /** Translated one-line text of a violation, falling back to the engine's English description. */

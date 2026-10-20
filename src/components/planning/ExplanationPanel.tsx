@@ -20,6 +20,12 @@ export function ExplanationPanel({
 }) {
   const t = useT();
   const params = { ...trace.inputs, ...(trace.intermediateValues ?? {}) };
+  // Known input names get a readable label; order ids and other data keep their name.
+  const label = (name: string): string => {
+    const key = `trace.${name}`;
+    const text = t(key);
+    return text === key ? name : text;
+  };
   return (
     <section className="card explain" aria-live="polite">
       <div className="card-header">
@@ -33,13 +39,13 @@ export function ExplanationPanel({
       <dl>
         {Object.entries(trace.inputs).map(([name, value]) => (
           <div key={name} style={{ display: "contents" }}>
-            <dt>{name}</dt>
+            <dt>{label(name)}</dt>
             <dd>{formatValue(value)}</dd>
           </div>
         ))}
         {Object.entries(trace.intermediateValues ?? {}).map(([name, value]) => (
           <div key={name} style={{ display: "contents" }}>
-            <dt>{name}</dt>
+            <dt>{label(name)}</dt>
             <dd>{formatValue(value)}</dd>
           </div>
         ))}

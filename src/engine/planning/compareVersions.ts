@@ -47,3 +47,65 @@ export const compareKpis = (before: KpiResult, after: KpiResult): KpiDelta[] =>
 
 export const compareVersions = (a: PlanningVersion, b: PlanningVersion): KpiDelta[] =>
   compareKpis(a.projectedKpis, b.projectedKpis);
+
+export interface QuantityDelta {
+  id: string;
+  before: number;
+  after: number;
+  change: "BETTER" | "WORSE" | "SAME";
+}
+
+const lowerIsBetter = (id: string, before: number, after: number): QuantityDelta => ({
+  id,
+  before,
+  after,
+  change: Math.abs(after - before) < 1e-9 ? "SAME" : after < before ? "BETTER" : "WORSE",
+});
+
+/** Overload hours per work centre over the whole horizon. */
+export const overloadByWorkCenter = (version: PlanningVersion): Record<string, number> => {
+  const result: Record<string, number> = {};
+  for (const bucket of version.crpResult.buckets) {
+    result[bucket.workCenterId] = (result[bucket.workCenterId] ?? 0) + Math.max(0, -bucket.balanceHours);
+  }
+  return result;
+};
+
+/** Largest projected shortage (negative balance) per item over the horizon. */
+export const shortageByItem = (version: PlanningVersion): Record<string, number> =>
+  Object.fromEntries(
+    version.mrpResult.records.map((record) => [record.itemId, Math.max(0, -Math.min(0, ...record.projectedAvailable))]),
+  );
+
+export interface DetailedComparison {
+  kpis: KpiDelta[];
+  /** Only work centres / items where either version has a problem. */
+  workCenters: QuantityDelta[];
+  items: QuantityDelta[];
+  violationsBefore: number;
+  violationsAfter: number;
+}
+
+/**
+ * "Plan V1 → Plan V2": KPIs plus the concrete problems behind them, e.g.
+ * WC200 overload 14 h → 4 h, RM2 shortage 80 → 0.
+ */
+export const compareVersionsDetailed = (a: PlanningVersion, b: PlanningVersion): DetailedComparison => {
+  const overloadA = overloadByWorkCenter(a);
+  const overloadB = overloadByWorkCenter(b);
+  const shortageA = shortageByItem(a);
+  const shortageB = shortageByItem(b);
+  const workCenterIds = [...new Set([...Object.keys(overloadA), ...Object.keys(overloadB)])].sort();
+  const itemIds = [...new Set([...Object.keys(shortageA), ...Object.keys(shortageB)])].sort();
+  const relevant = (delta: QuantityDelta) => delta.before > 1e-9 || delta.after > 1e-9;
+  const counted = (v: PlanningVersion) => v.violations.filter((x) => x.severity !== "INFO").length;
+  return {
+    kpis: compareVersions(a, b),
+    workCenters: workCenterIds
+      .map((id) => lowerIsBetter(id, overloadA[id] ?? 0, overloadB[id] ?? 0))
+      .filter(relevant),
+    items: itemIds.map((id) => lowerIsBetter(id, shortageA[id] ?? 0, shortageB[id] ?? 0)).filter(relevant),
+    violationsBefore: counted(a),
+    violationsAfter: counted(b),
+  };
+};

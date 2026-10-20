@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { CalculationTrace } from "../../domain/common";
 import type { ItemPlanRecord, MpsRecord } from "../../domain/planningVersion";
+import { canPerform } from "../../engine/game/stateMachine";
 import { describePolicy } from "../../engine/mrp/lotSizing";
+import { useGameStore } from "../../state/gameStore";
 import { useT } from "../../state/selectors";
 import type { TimePhasedRow } from "../tables/TimePhasedTable";
 import { TimePhasedTable } from "../tables/TimePhasedTable";
@@ -26,8 +28,15 @@ export function ItemPlanView({
   demandTimeFenceEnd?: number;
 }) {
   const t = useT();
+  const game = useGameStore((state) => state.game);
+  const scenario = useGameStore((state) => state.scenario);
+  const updateForecast = useGameStore((state) => state.updateForecast);
+  const canEdit = !!game && canPerform(game, "CHANGE_PLAN").allowed;
+  const forecastEditableFrom =
+    scenario?.settings.forecastEditable && demandTimeFenceEnd !== undefined ? demandTimeFenceEnd + 1 : undefined;
   const [selected, setSelected] = useState<{ row: string; period: number; label: string } | null>(null);
   const uncovered = new Set(record.uncoveredPeriods);
+  const firm = new Set(record.firmPeriods ?? []);
   const pabTooltip = (index: number) => t(`risk.${record.risk[index]}`);
 
   const common: TimePhasedRow[] = [
@@ -60,6 +69,8 @@ export function ItemPlanView({
       kind: "calc",
       emphasis: true,
       traceRow: "receipt",
+      cellClass: (index) => (firm.has(record.periods[index]) ? "manual" : ""),
+      tooltip: (index) => (firm.has(record.periods[index]) ? t("row.firmMarker") : undefined),
     },
     {
       key: "pab",
@@ -83,13 +94,31 @@ export function ItemPlanView({
 
   const rows: TimePhasedRow[] = isMps(record)
     ? [
-        { key: "forecast", label: t("row.forecast"), values: record.forecast, kind: "input" },
+        {
+          key: "forecast",
+          label: t("row.forecast"),
+          values: record.forecast,
+          kind: "input",
+          editable: (index) =>
+            forecastEditableFrom !== undefined && canEdit && record.periods[index] >= forecastEditableFrom,
+          onEdit: (index, value) => updateForecast(record.itemId, record.periods[index], value),
+        },
         { key: "orders", label: t("row.customerOrders"), values: record.customerOrders, kind: "input" },
-        { key: "demand", label: t("row.totalDemand"), values: record.grossRequirements, kind: "calc", emphasis: true },
+        { key: "demand", label: t("row.totalDemand"), values: record.grossRequirements, kind: "calc", emphasis: true, traceRow: "gross" },
         ...common,
-        { key: "atp", label: t("row.atp"), values: record.atp, kind: "calc" },
+        { key: "atp", label: t("row.atp"), values: record.atp, kind: "calc", traceRow: "atp" },
       ]
-    : [{ key: "gross", label: t("row.grossRequirements"), values: record.grossRequirements, kind: "calc", emphasis: true }, ...common];
+    : [
+        {
+          key: "gross",
+          label: t("row.grossRequirements"),
+          values: record.grossRequirements,
+          kind: "calc",
+          emphasis: true,
+          traceRow: "gross",
+        },
+        ...common,
+      ];
 
   const trace = (row: string, period: number): CalculationTrace | undefined => record.traces[`${row}:${period}`];
   const selectedTrace = selected ? trace(selected.row, selected.period) : undefined;
@@ -125,7 +154,10 @@ export function ItemPlanView({
           </div>
         </div>
         {demandTimeFenceEnd !== undefined && (
-          <p className="muted small">{t("plan.dtfNote", { period: demandTimeFenceEnd })}</p>
+          <p className="muted small">
+            {t("plan.dtfNote", { period: demandTimeFenceEnd })}
+            {forecastEditableFrom !== undefined && ` ${t("forecast.editHint", { period: forecastEditableFrom })}`}
+          </p>
         )}
         <TimePhasedTable
           caption={`${record.itemId} ${itemName}`}
@@ -144,6 +176,7 @@ export function ItemPlanView({
           <span className="l-below">{t("risk.BELOW_SAFETY_STOCK")}</span>
           <span className="l-shortage">{t("risk.SHORTAGE")}</span>
           <span className="l-uncovered">{t("plan.uncovered")}</span>
+          <span className="l-manual">{t("plan.firmLegend")}</span>
         </div>
         <p className="muted small" style={{ marginTop: "0.5rem" }}>
           {t("plan.cellHelp")}

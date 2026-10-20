@@ -2,14 +2,26 @@ import { Link } from "react-router-dom";
 import { KpiCard } from "../components/common/KpiCard";
 import { ViolationList } from "../components/common/ViolationList";
 import { WorkflowActions } from "../components/common/WorkflowActions";
+import { cumulativeServiceLevel } from "../engine/events/evaluateEventTriggers";
 import { latestVersion } from "../engine/game/gameActions";
 import { useGameStore } from "../state/gameStore";
 import { currentViolations, useT } from "../state/selectors";
 import { formatHours, formatMoney, formatPercent } from "../utils/format";
 
 const nextStepKey = (status: string, stale: boolean, hasVersion: boolean): string => {
-  if (status === "PERIOD_START") return "next.startWeek";
-  if (status === "PLAN_COMMITTED" && !stale) return "next.simulate";
+  switch (status) {
+    case "PERIOD_START":
+      return "next.startWeek";
+    case "EVENTS_PENDING":
+      return "next.readMessages";
+    case "PERIOD_SIMULATED":
+      return "next.review";
+    case "PERIOD_REVIEW":
+      return "next.nextWeek";
+    case "GAME_COMPLETED":
+      return "next.completed";
+  }
+  if (status === "PLAN_COMMITTED" && !stale) return "next.simulateNow";
   if (stale && hasVersion) return "next.rerun";
   if (hasVersion) return "next.commit";
   return "next.runPlanning";
@@ -23,7 +35,13 @@ export function DashboardPage() {
   const version = latestVersion(game);
   const kpis = version?.projectedKpis;
   const currency = scenario.settings.currency;
-  const violations = currentViolations(game).filter((v) => v.severity !== "INFO");
+  const violations = currentViolations(game, scenario.settings.frozenZonePeriods).filter(
+    (v) => v.severity !== "INFO",
+  );
+  const realisedResult = game.kpiHistory.reduce((sum, entry) => sum + entry.kpis.netContribution, 0);
+  const activeEffects = game.activeEventEffects.filter(
+    (effect) => effect.fromPeriod <= game.currentPeriod && effect.toPeriod >= game.currentPeriod,
+  );
   const recent = [...game.decisions].reverse().slice(0, 6);
 
   return (
@@ -43,6 +61,27 @@ export function DashboardPage() {
         </p>
         <WorkflowActions />
       </section>
+
+      {game.completedPeriods.length > 0 && (
+        <>
+          <h2>{t("dashboard.realised")}</h2>
+          <div className="grid kpis">
+            <KpiCard label={t("dashboard.cumulativeService")} value={formatPercent(cumulativeServiceLevel(game))} />
+            <KpiCard label={t("dashboard.cumulativeResult")} value={formatMoney(realisedResult, currency)} />
+            <KpiCard
+              label={t("kpi.lateCustomerOrders")}
+              value={game.customerOrders.filter((order) => order.status === "LATE").length}
+            />
+          </div>
+        </>
+      )}
+
+      {activeEffects.length > 0 && (
+        <div className="banner warning" role="status">
+          <strong>{t("dashboard.activeEffects")}:</strong>{" "}
+          {activeEffects.map((effect) => `${effect.description} (${effect.fromPeriod}–${effect.toPeriod})`).join(" · ")}
+        </div>
+      )}
 
       {kpis ? (
         <>
@@ -86,8 +125,11 @@ export function DashboardPage() {
                   <span className="badge mode">{decision.id}</span>
                   <div>
                     <div>
-                      {decision.entityId} · {decision.field ?? decision.category}:{" "}
-                      {JSON.stringify(decision.previousValue)} → {JSON.stringify(decision.newValue)}
+                      <strong>{decision.category}</strong> · {decision.entityId}
+                      {decision.field && !decision.field.includes("@") ? ` · ${decision.field}` : ""}
+                      {decision.previousValue !== undefined || decision.newValue !== undefined
+                        ? `: ${JSON.stringify(decision.previousValue ?? "–")} → ${JSON.stringify(decision.newValue ?? "–")}`
+                        : ""}
                     </div>
                     {decision.reason && <div className="related">“{decision.reason}”</div>}
                   </div>

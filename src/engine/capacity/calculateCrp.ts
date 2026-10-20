@@ -15,10 +15,28 @@ export interface LoadableOrder {
   orderType: "PLANNED" | "RELEASED";
   /** True when work on the order has started on the shop floor. */
   started: boolean;
+  /** Routing steps already finished (set by the simulation). */
+  completedOperations?: number;
   quantity: number;
   releasePeriod: number;
   duePeriod: number;
 }
+
+/**
+ * Number of finished operations. Without simulation data, a started order is
+ * assumed to have finished the operations scheduled before the current period.
+ */
+export const completedOperationsOf = (
+  order: LoadableOrder,
+  operationCount: number,
+  currentPeriod: number,
+): number => {
+  if (order.completedOperations !== undefined) return order.completedOperations;
+  if (!order.started) return 0;
+  let done = 0;
+  while (done < operationCount && operationPeriod(order, done, operationCount) < currentPeriod) done++;
+  return done;
+};
 
 /**
  * Load without any capacity would be an infinite utilisation; a finite cap
@@ -83,6 +101,7 @@ export const loadableOrders = (
       itemId: order.itemId,
       orderType: "RELEASED" as const,
       started: order.status === "IN_PROGRESS",
+      completedOperations: order.completedOperations,
       quantity: order.quantity,
       releasePeriod: order.releasePeriod,
       duePeriod: order.duePeriod,
@@ -91,9 +110,8 @@ export const loadableOrders = (
 
 /**
  * Detailed capacity requirements per work centre, period, order and operation.
- * Operations scheduled before the current period are treated as done for
- * started (IN_PROGRESS) orders. For orders that are released but not started
- * the work is still ahead, so it is loaded in the current period.
+ * Finished operations are not loaded. Remaining work that was scheduled before
+ * the current period is still ahead, so it is loaded in the current period.
  */
 export const calculateCrp = (input: PlanningInput, orders: readonly LoadableOrder[]): CrpResult => {
   const contributions = new Map<string, CapacityContribution[]>();
@@ -101,9 +119,10 @@ export const calculateCrp = (input: PlanningInput, orders: readonly LoadableOrde
 
   for (const order of orders) {
     const operations = operationsFor(input.routings, order.itemId);
+    const done = completedOperationsOf(order, operations.length, input.currentPeriod);
     operations.forEach((operation, index) => {
+      if (index < done) return;
       const scheduled = operationPeriod(order, index, operations.length);
-      if (scheduled < input.currentPeriod && order.started) return;
       const period = Math.max(scheduled, input.currentPeriod);
       const load = operationLoad(operation, order.quantity);
       const bucketKey = key(operation.workCenterId, period);

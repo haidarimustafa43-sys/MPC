@@ -1,4 +1,6 @@
+import type { GameState } from "../domain/gameState";
 import type { Item } from "../domain/item";
+import { acknowledgeMessage, markMessageRead } from "../engine/game/inboxActions";
 import type { PlanningInput } from "../engine/planningInput";
 import { horizonPeriods } from "../engine/planningInput";
 import type { TimePhaseInput } from "../engine/mrp/timePhaseOrders";
@@ -51,6 +53,7 @@ export const planningInput = (overrides: Partial<PlanningInput> = {}): PlanningI
   forecast: [],
   customerOrders: [],
   releasedOrders: [],
+  firmPlannedOrders: [],
   inventory: [],
   capacityAdjustments: [],
   settings: {
@@ -67,3 +70,10 @@ export const planningInput = (overrides: Partial<PlanningInput> = {}): PlanningI
 });
 
 export const FIXED_TIME = "2026-01-05T08:00:00.000Z";
+
+/** Reads every message and acknowledges those that need it (decisions stay open). */
+export const takeInMessages = (game: GameState): GameState =>
+  game.inboxMessages.reduce((state, message) => {
+    const read = markMessageRead(state, message.id);
+    return message.acknowledgementRequired && !message.decisionRequired ? acknowledgeMessage(read, message.id) : read;
+  }, game);

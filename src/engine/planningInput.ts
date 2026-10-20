@@ -3,7 +3,11 @@ import type { CustomerOrder, ForecastEntry } from "../domain/demand";
 import type { InventoryBalance } from "../domain/inventory";
 import type { Item } from "../domain/item";
 import type { Order } from "../domain/order";
-import type { ItemPlanningParameters, WorkCenterCapacityAdjustment } from "../domain/planningVersion";
+import type {
+  ItemPlanningParameters,
+  PlannedOrder,
+  WorkCenterCapacityAdjustment,
+} from "../domain/planningVersion";
 import type { RoutingOperation } from "../domain/routing";
 import type { ScenarioSettings } from "../domain/scenario";
 import type { Supplier } from "../domain/supplier";
@@ -27,6 +31,8 @@ export interface PlanningInput {
   forecast: ForecastEntry[];
   customerOrders: CustomerOrder[];
   releasedOrders: Order[];
+  /** Firm planned orders fixed by the student. */
+  firmPlannedOrders: PlannedOrder[];
   inventory: InventoryBalance[];
   capacityAdjustments: WorkCenterCapacityAdjustment[];
   settings: ScenarioSettings;

@@ -140,8 +140,23 @@ export const evaluatePlanConstraints = (
       });
     }
 
+    for (const order of record.plannedOrders.filter((o) => o.firm && o.releasePeriod < input.currentPeriod)) {
+      violations.push({
+        id: `PAST_DUE_RELEASE-${order.id}`,
+        type: "LATE_PLANNED_RELEASE",
+        severity: "CRITICAL",
+        title: `${order.id} should already have been released`,
+        description: `Firm planned order ${order.id} (${record.itemId}) had its release date in period ${order.releasePeriod} and has not been released.`,
+        period: order.releasePeriod,
+        itemId: record.itemId,
+        relatedOrderIds: [order.id],
+        params: { item: record.itemId, order: order.id, period: order.neededPeriod },
+        source: endItemIds.has(record.itemId) ? "MPS" : "MRP",
+      });
+    }
+
     const releaseNow = record.plannedOrders.filter(
-      (order) => order.releasePeriod === input.currentPeriod,
+      (order) => order.releasePeriod <= input.currentPeriod,
     );
     if (releaseNow.length > 0) {
       violations.push({
@@ -263,7 +278,7 @@ const supplierViolations = (input: PlanningInput): ConstraintViolation[] =>
     });
 
 /** Workflow problems that depend on the game state rather than on a plan. */
-export const evaluateGameConstraints = (game: GameState): ConstraintViolation[] => {
+export const evaluateGameConstraints = (game: GameState, frozenZonePeriods = 1): ConstraintViolation[] => {
   const violations: ConstraintViolation[] = [];
   const versionsThisPeriod = game.planningVersions.filter((v) => v.period === game.currentPeriod);
   if (game.pendingDecisionIds.length > 0 && versionsThisPeriod.length > 0) {
@@ -276,6 +291,37 @@ export const evaluateGameConstraints = (game: GameState): ConstraintViolation[] 
       params: { count: game.pendingDecisionIds.length },
       source: "DATA",
     });
+  }
+  for (const message of game.inboxMessages) {
+    if (message.decisionRequired && message.status !== "RESPONDED") {
+      violations.push({
+        id: `DECISION_PENDING-${message.id}`,
+        type: "DECISION_PENDING",
+        severity: "WARNING",
+        title: "Decision pending",
+        description: `"${message.title.en}" from ${message.sender} needs an answer before the week can be simulated.`,
+        params: { sender: message.sender, title: message.title.en },
+        source: "EVENT",
+      });
+    }
+  }
+  for (const order of game.plannedOrders) {
+    const decidedThisWeek = game.decisions.some(
+      (d) => d.period === game.currentPeriod && d.category === "FIRM_PLANNED_ORDER" && d.entityId === order.id,
+    );
+    if (decidedThisWeek && order.releasePeriod < game.currentPeriod + frozenZonePeriods) {
+      violations.push({
+        id: `FROZEN_ZONE_VIOLATION-${order.id}`,
+        type: "FROZEN_ZONE_VIOLATION",
+        severity: "WARNING",
+        title: `${order.id} changed inside the frozen zone`,
+        description: `Firm planned order ${order.id} (${order.itemId}) was changed although its release lies inside the frozen zone.`,
+        itemId: order.itemId,
+        relatedOrderIds: [order.id],
+        params: { order: order.id, item: order.itemId },
+        source: "DATA",
+      });
+    }
   }
   const committedThisPeriod = versionsThisPeriod.some((v) => v.id === game.committedPlanVersionId);
   if (versionsThisPeriod.length > 0 && !committedThisPeriod) {
