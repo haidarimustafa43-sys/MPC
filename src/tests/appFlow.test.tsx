@@ -103,6 +103,49 @@ describe("app flow", () => {
     expect(game?.currentPeriod).toBe(2);
   });
 
+  it("tries a customer request in a what-if plan and undoes the answer by discarding", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByLabelText("Team name"), "Team Request");
+    await user.click(screen.getByRole("button", { name: "Start new game" }));
+    await startWeekAndAcknowledge(user);
+    await user.click(screen.getByRole("link", { name: "Dashboard" }));
+    await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
+    await user.click(await screen.findByRole("button", { name: /Release all due orders/ }));
+    await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "Commit plan" })[0]);
+    await user.click((await screen.findAllByRole("button", { name: "Simulate week" }))[0]);
+    await user.click((await screen.findAllByRole("button", { name: "Review period result" }))[0]);
+    await user.click(screen.getAllByRole("button", { name: "Start next week" })[0]);
+
+    // The pop-up says the answer is final and how to try it first.
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/choose Read later and open the request from the Inbox/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Read later" }));
+    await user.click(screen.getByRole("link", { name: /Inbox/ }));
+    await user.click(screen.getByRole("button", { name: /New customer orders for week 5/ }));
+    await user.click(screen.getByRole("button", { name: /Request to increase order quantity/ }));
+    expect(screen.getByText(/Your answer here is final/)).toBeInTheDocument();
+
+    // No planning run this week yet: starting the what-if plans the live game first.
+    await user.click(screen.getByRole("button", { name: "Explore in a what-if plan" }));
+    expect(await screen.findByText(/Your answer only applies to this what-if plan/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Review planning before deciding" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Accept" }));
+    expect(await screen.findByText(/Answered in the what-if plan: Accept/)).toBeInTheDocument();
+
+    const banner = screen.getByRole("region", { name: "WHAT-IF PLAN" });
+    await user.click(within(banner).getByRole("button", { name: "Run planning" }));
+    expect(await within(banner).findByRole("button", { name: /Hide comparison PV-2-1 → PV-2-2/ })).toBeInTheDocument();
+
+    await user.click(within(banner).getByRole("button", { name: "Discard what-if" }));
+    await waitFor(() => expect(useGameStore.getState().game?.whatIf).toBeUndefined());
+    const live = useGameStore.getState().game!;
+    expect(live.customerOrders.find((o) => o.id === "CO-1005")?.quantity).toBe(150);
+    expect(await screen.findByText(/Your answer here is final/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+  });
+
   it("explores a what-if plan and discards it without changing the live game", async () => {
     const user = userEvent.setup();
     render(<App />);

@@ -6,6 +6,7 @@ import type { Scenario } from "../domain/scenario";
 import {
   commitPlan,
   createGameState,
+  latestVersion,
   resetWorkingPlan,
   runPlanningVersion,
   setCapacityAdjustment,
@@ -346,10 +347,17 @@ export const useGameStore = create<GameStore>()((set, get) => {
     updateForecast: (itemId, period, quantity, reason) =>
       mutate((game, scenario) => updateForecast(game, scenario, itemId, period, quantity, now(), reason)),
     enterWhatIf: () => {
-      const { game, language } = get();
-      if (!game) return;
+      const { game, scenario, language } = get();
+      if (!game || !scenario) return;
       try {
-        set({ liveGame: game, game: startWhatIf(game, now()), error: null });
+        // The banner compares the branch with the live plan of this week, so
+        // make sure there is an up-to-date one to compare with.
+        let live = game;
+        if (!latestVersion(live) || live.pendingDecisionIds.length > 0) {
+          live = runPlanningVersion(live, scenario, now());
+          scheduleSave(live);
+        }
+        set({ liveGame: live, game: startWhatIf(live, now()), error: null });
       } catch (error) {
         set({ error: describeError(error, language) });
       }

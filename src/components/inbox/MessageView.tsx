@@ -24,12 +24,21 @@ export function MessageView({ message, headingLevel = "h2", onDone, extraActions
   const scenario = useGameStore((state) => state.scenario);
   const acknowledge = useGameStore((state) => state.acknowledge);
   const respond = useGameStore((state) => state.respond);
+  const inWhatIf = useGameStore((state) => Boolean(state.game?.whatIf));
+  const answeredLive = useGameStore(
+    (state) => state.liveGame?.inboxMessages.find((m) => m.id === message.id)?.status === "RESPONDED",
+  );
   const [reason, setReason] = useState("");
   const event = scenario?.events.find((candidate) => candidate.id === message.eventId);
-  const choices = event?.choices ?? [];
+  // Deferring a decision means nothing inside a what-if plan: the answer can be undone anyway.
+  const choices = (event?.choices ?? []).filter((choice) => !(inWhatIf && choice.defersDecision));
   const Heading = headingLevel;
   const answered = message.status === "RESPONDED";
-  const chosen = choices.find((choice) => choice.id === message.choiceId);
+  const chosen = event?.choices?.find((choice) => choice.id === message.choiceId);
+  const openDecision = message.decisionRequired && !answered;
+  // In the live game the what-if is offered first: answers there are final.
+  const offerWhatIf = openDecision && !inWhatIf && !extraActions;
+  const answeredInWhatIf = answered && inWhatIf && !answeredLive;
   const needsAck =
     message.acknowledgementRequired && !message.decisionRequired && message.status !== "ACKNOWLEDGED";
 
@@ -51,10 +60,17 @@ export function MessageView({ message, headingLevel = "h2", onDone, extraActions
         </p>
       )}
 
-      {message.decisionRequired && !answered && (
+      {openDecision && (
         <>
           {message.status === "READ" && message.choiceId === undefined && (
             <p className="muted small">{t("next.openDecisions")}</p>
+          )}
+          {inWhatIf ? (
+            <p className="whatif-note small" role="note">
+              <span className="badge whatif">{t("mode.whatIf")}</span> {t("whatIf.answerHere")}
+            </p>
+          ) : (
+            <p className="small">{t(offerWhatIf ? "whatIf.answerFinal" : "whatIf.answerFinalLater")}</p>
           )}
           <label className="field" style={{ marginBottom: "0.5rem" }}>
             {t("inbox.reasonLabel")}
@@ -80,12 +96,12 @@ export function MessageView({ message, headingLevel = "h2", onDone, extraActions
             {t("action.acknowledge")}
           </button>
         )}
-        {message.decisionRequired &&
-          !answered &&
+        {offerWhatIf && <StartWhatIfButton label={t("whatIf.exploreRequest")} primary />}
+        {openDecision &&
           choices.map((choice, index) => (
             <button
               key={choice.id}
-              className={index === 0 ? "primary" : ""}
+              className={index === 0 && inWhatIf ? "primary" : ""}
               onClick={() => {
                 respond(message.id, choice.id, reason.trim() || undefined);
                 onDone?.();
@@ -94,10 +110,15 @@ export function MessageView({ message, headingLevel = "h2", onDone, extraActions
               {localize(choice.label, language)}
             </button>
           ))}
-        {message.decisionRequired && !answered && !extraActions && <StartWhatIfButton label={t("whatIf.exploreRequest")} />}
         {extraActions}
       </div>
-      {answered && chosen && (
+      {answeredInWhatIf && chosen && (
+        <p className="whatif-note small" role="status" style={{ marginTop: "0.5rem" }}>
+          <span className="badge whatif">{t("mode.whatIf")}</span>{" "}
+          {t("whatIf.answeredHere", { choice: localize(chosen.label, language) })}
+        </p>
+      )}
+      {answered && !answeredInWhatIf && chosen && (
         <p className="badge ok" style={{ marginTop: "0.5rem" }}>
           {t("inbox.answered", { choice: localize(chosen.label, language) })}
         </p>

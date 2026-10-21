@@ -79,15 +79,28 @@ export function WhatIfBanner() {
 }
 
 /** Starts a what-if branch from the live game. */
-export function StartWhatIfButton({ label }: { label?: string }) {
+export function StartWhatIfButton({ label, primary }: { label?: string; primary?: boolean }) {
   const t = useT();
   const game = useGameStore((state) => state.game);
   const enterWhatIf = useGameStore((state) => state.enterWhatIf);
   if (!game || game.whatIf) return null;
   const allowed = ["ANALYSIS", "PLANNING_DIRTY", "PLAN_CALCULATED", "PLAN_COMMITTED"].includes(game.gameStatus);
-  return (
-    <button onClick={enterWhatIf} disabled={!allowed} title={allowed ? t("whatIf.startHelp") : t("whatIf.startNotNow")}>
+  const button = (
+    <button
+      className={primary && allowed ? "primary" : ""}
+      onClick={enterWhatIf}
+      disabled={!allowed}
+      title={allowed ? t("whatIf.startHelp") : t("whatIf.startNotNow")}
+    >
       {label ?? t("whatIf.start")}
     </button>
+  );
+  if (allowed || !primary) return button;
+  // A disabled main action needs its reason in plain sight, not only in a tooltip.
+  return (
+    <>
+      {button}
+      <span className="muted small">{t("whatIf.startNotNow")}</span>
+    </>
   );
 }
