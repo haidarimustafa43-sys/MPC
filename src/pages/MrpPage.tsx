@@ -28,7 +28,8 @@ export function MrpPage() {
             label={t("plan.item")}
             items={records.map((r) => ({
               id: r.itemId,
-              label: `${r.itemId} (${t("plan.lowLevelCode")} ${r.lowLevelCode})`,
+              // The low-level code is shown in the record header, not repeated in every tab.
+              label: r.itemId,
               flagged: r.risk.some((risk) => risk !== "OK") || r.uncoveredPeriods.length > 0,
             }))}
             selectedId={record.itemId}

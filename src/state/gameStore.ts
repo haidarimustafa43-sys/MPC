@@ -98,7 +98,11 @@ interface GameStoreActions {
   respond: (messageId: string, choiceId: string, reason?: string) => void;
   releaseOrder: (plannedOrderId: string, reason?: string) => void;
   releaseAllDue: (reason?: string) => void;
-  firmOrder: (plannedOrderId: string, changes: { quantity?: number; receiptPeriod?: number }, reason?: string) => void;
+  firmOrder: (
+    plannedOrderId: string,
+    changes: { quantity?: number; receiptPeriod?: number; supplierId?: string },
+    reason?: string,
+  ) => void;
   cancelFirmOrder: (orderId: string, reason?: string) => void;
   expedite: (orderId: string, reason?: string) => void;
   decideCustomerOrder: (orderId: string, accept: boolean, reason?: string) => void;

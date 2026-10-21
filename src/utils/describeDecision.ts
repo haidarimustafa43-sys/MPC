@@ -104,7 +104,9 @@ export const describeDecision = (
             week: plain(after.receiptPeriod),
           }),
         );
-        return from ? `${t("decisionText.from", { order: from })}: ${text}` : text;
+        const supplier =
+          after.supplierId !== undefined ? `, ${arrow(supplierName(before.supplierId), supplierName(after.supplierId))}` : "";
+        return from ? `${t("decisionText.from", { order: from })}: ${text}${supplier}` : `${text}${supplier}`;
       }
       case "CANCEL_FIRM_ORDER": {
         const before = isRecord(prev) ? prev : {};

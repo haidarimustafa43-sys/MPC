@@ -23,6 +23,20 @@ const effectiveItem = (scenario: Scenario, game: GameState, itemId: string) => {
   return item;
 };
 
+/**
+ * Lead time of an order: a purchase order with its own supplier takes that
+ * supplier's lead time, everything else the item's (with the student's
+ * parameters applied).
+ */
+const leadTimeOf = (scenario: Scenario, game: GameState, itemId: string, supplierId?: string): number => {
+  const supplier = supplierId ? game.suppliers.find((candidate) => candidate.id === supplierId) : undefined;
+  return supplier ? supplier.normalLeadTimePeriods : effectiveItem(scenario, game, itemId).leadTimePeriods;
+};
+
+/** Suppliers that can deliver an item and are active. */
+export const suppliersFor = (game: GameState, itemId: string) =>
+  game.suppliers.filter((supplier) => supplier.active && supplier.suppliedItemIds.includes(itemId));
+
 /** A planned order of the latest version or a firm planned order of the game. */
 export const findPlannedOrder = (game: GameState, orderId: string): PlannedOrder | undefined =>
   game.plannedOrders.find((order) => order.id === orderId) ??
@@ -43,10 +57,14 @@ const releasedThisWeek = (game: GameState): Set<string | undefined> =>
  */
 export const currentPlannedOrders = (game: GameState): PlannedOrder[] => {
   const released = releasedThisWeek(game);
-  // A planned order that was turned into a firm order this week is represented by the firm order.
+  // A planned order that was turned into a firm order this week is represented by the firm order,
+  // as long as that firm order exists: cancelling it brings the original MRP order back.
+  const firmIds = new Set(game.plannedOrders.map((order) => order.id));
   const firmed = new Set(
     game.decisions
-      .filter((d) => d.category === "FIRM_PLANNED_ORDER" && d.period === game.currentPeriod)
+      .filter(
+        (d) => d.category === "FIRM_PLANNED_ORDER" && d.period === game.currentPeriod && firmIds.has(d.entityId ?? ""),
+      )
       .map((d) => (d.previousValue as { from?: string } | undefined)?.from),
   );
   const fromVersion = (latestVersion(game)?.mrpResult.records ?? []).flatMap((record) => record.plannedOrders);
@@ -85,11 +103,12 @@ export const releasePlannedOrder = (
     );
   }
   const item = effectiveItem(scenario, game, planned.itemId);
-  const duePeriod = Math.max(planned.receiptPeriod, game.currentPeriod + item.leadTimePeriods);
+  const supplierId = planned.kind === "PURCHASE" ? (planned.supplierId ?? item.supplierId) : undefined;
+  const leadTime = leadTimeOf(scenario, game, planned.itemId, supplierId);
+  const duePeriod = Math.max(planned.receiptPeriod, game.currentPeriod + leadTime);
   const number = nextOrderNumber(game);
   let order: Order;
   if (planned.kind === "PURCHASE") {
-    const supplierId = planned.supplierId ?? item.supplierId;
     const supplier = game.suppliers.find((candidate) => candidate.id === supplierId);
     if (!supplier || !supplier.active) {
       throw new GameActionError("orders.supplierUnavailable", { supplier: supplierId ?? "", item: item.id });
@@ -153,23 +172,28 @@ export const releaseAllDueOrders = (
   );
 
 /** The earliest receipt period a planned order can be moved to: released this week plus lead time. */
-export const earliestReceiptPeriod = (game: GameState, scenario: Scenario, order: PlannedOrder): number =>
-  game.currentPeriod + effectiveItem(scenario, game, order.itemId).leadTimePeriods;
+export const earliestReceiptPeriod = (
+  game: GameState,
+  scenario: Scenario,
+  order: PlannedOrder,
+  supplierId = order.supplierId,
+): number => game.currentPeriod + leadTimeOf(scenario, game, order.itemId, order.kind === "PURCHASE" ? supplierId : undefined);
 
 /** Express delivery only helps an order that is not already due this week. */
 export const canExpedite = (game: GameState, order: { duePeriod: number; expedited?: boolean }): boolean =>
   !order.expedited && order.duePeriod > game.currentPeriod;
 
 /**
- * Creates or changes a firm planned order: a fixed quantity and/or receipt
- * period. Moving an order earlier or later and changing its quantity are all
- * done this way. The release (receipt − lead time) may not lie in the past.
+ * Creates or changes a firm planned order: a fixed quantity, receipt period
+ * and, for purchases, supplier. Moving an order earlier or later, changing its
+ * quantity and buying it elsewhere are all done this way. The release
+ * (receipt − the supplier's or item's lead time) may not lie in the past.
  */
 export const firmPlannedOrder = (
   game: GameState,
   scenario: Scenario,
   plannedOrderId: string,
-  changes: { quantity?: number; receiptPeriod?: number },
+  changes: { quantity?: number; receiptPeriod?: number; supplierId?: string },
   now: string,
   reason?: string,
 ): GameState => {
@@ -180,7 +204,12 @@ export const firmPlannedOrder = (
   const quantity = Math.round(changes.quantity ?? source.quantity);
   const receiptPeriod = Math.round(changes.receiptPeriod ?? source.receiptPeriod);
   if (!(quantity > 0)) throw new GameActionError("orders.invalidQuantity");
-  const releasePeriod = receiptPeriod - item.leadTimePeriods;
+  const previousSupplierId = source.kind === "PURCHASE" ? (source.supplierId ?? item.supplierId) : undefined;
+  const supplierId = source.kind === "PURCHASE" ? (changes.supplierId ?? previousSupplierId) : undefined;
+  if (supplierId && !suppliersFor(game, source.itemId).some((supplier) => supplier.id === supplierId)) {
+    throw new GameActionError("orders.supplierUnavailable", { supplier: supplierId, item: source.itemId });
+  }
+  const releasePeriod = receiptPeriod - leadTimeOf(scenario, game, source.itemId, supplierId);
   if (releasePeriod < game.currentPeriod) {
     throw new GameActionError("orders.releaseInPast", { period: releasePeriod });
   }
@@ -192,10 +221,11 @@ export const firmPlannedOrder = (
     receiptPeriod,
     releasePeriod,
     neededPeriod: source.neededPeriod,
-    supplierId: source.kind === "PURCHASE" ? (source.supplierId ?? item.supplierId) : undefined,
+    supplierId,
     compressed: false,
     firm: true,
   };
+  const supplierChanged = supplierId !== previousSupplierId;
   return recordDecision(
     { ...game, plannedOrders: [...game.plannedOrders.filter((order) => order.id !== firm.id), firm] },
     {
@@ -204,8 +234,13 @@ export const firmPlannedOrder = (
       entityType: "PLANNED_ORDER",
       entityId: firm.id,
       field: changes.receiptPeriod !== undefined && changes.quantity === undefined ? "receiptPeriod" : "order",
-      previousValue: { quantity: source.quantity, receiptPeriod: source.receiptPeriod, from: source.id },
-      newValue: { quantity, receiptPeriod },
+      previousValue: {
+        quantity: source.quantity,
+        receiptPeriod: source.receiptPeriod,
+        from: source.id,
+        ...(supplierChanged ? { supplierId: previousSupplierId } : {}),
+      },
+      newValue: { quantity, receiptPeriod, ...(supplierChanged ? { supplierId } : {}) },
       reason,
     },
   );

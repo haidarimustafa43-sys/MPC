@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { ItemTabs } from "../components/planning/ItemTabs";
+import { PlanningParametersTable } from "../components/planning/PlanningParametersTable";
 import type { BomLine } from "../domain/bom";
 import { describePolicy } from "../engine/mrp/lotSizing";
 import { useGameStore } from "../state/gameStore";
 import { useT } from "../state/selectors";
 import { formatNumber } from "../utils/format";
 
-type Tab = "items" | "bom" | "routings" | "workCenters" | "suppliers";
+type Tab = "items" | "parameters" | "bom" | "routings" | "workCenters" | "suppliers";
 
 function BomTree({ itemId, bom, depth = 0 }: { itemId: string; bom: readonly BomLine[]; depth?: number }) {
   const children = bom.filter((line) => line.parentItemId === itemId);
@@ -24,7 +25,10 @@ function BomTree({ itemId, bom, depth = 0 }: { itemId: string; bom: readonly Bom
   );
 }
 
-/** Read-only scenario master data. Planning parameters are changed on the MPS/MRP pages. */
+/**
+ * Scenario master data, read-only, plus the student's planning parameters,
+ * which can be changed here as well as on the MPS/MRP pages.
+ */
 export function MasterDataPage() {
   const t = useT();
   const scenario = useGameStore((state) => state.scenario);
@@ -40,6 +44,7 @@ export function MasterDataPage() {
         label={t("nav.masterData")}
         items={[
           { id: "items", label: t("master.items") },
+          { id: "parameters", label: t("master.parameters") },
           { id: "bom", label: t("master.bom") },
           { id: "routings", label: t("master.routings") },
           { id: "workCenters", label: t("master.workCenters") },
@@ -88,6 +93,7 @@ export function MasterDataPage() {
             </table>
           </div>
         )}
+        {tab === "parameters" && <PlanningParametersTable />}
         {tab === "bom" && (
           <div className="grid cols-2">
             {scenario.items

@@ -114,6 +114,40 @@ describe("order decisions", () => {
     expect(game.plannedOrders).toHaveLength(0);
   });
 
+  it("brings the original MRP order back when a firm order made this week is cancelled", () => {
+    let game = planned(newGame());
+    const original = currentPlannedOrders(game).find((o) => o.id === "PL-C1-4")!;
+    game = firmPlannedOrder(game, scenario, "PL-C1-4", { receiptPeriod: 5 }, T);
+    const firm = game.plannedOrders[0];
+    expect(currentPlannedOrders(game).some((o) => o.id === "PL-C1-4")).toBe(false);
+
+    game = cancelFirmPlannedOrder(game, firm.id, T);
+    const restored = currentPlannedOrders(game).find((o) => o.id === "PL-C1-4");
+    expect(restored).toEqual(original);
+    expect(currentPlannedOrders(game).some((o) => o.id === firm.id)).toBe(false);
+  });
+
+  it("changes the supplier of a planned purchase order with that supplier's lead time and price", () => {
+    let game = planned(newGame());
+    const rm2 = currentPlannedOrders(game).find((o) => o.itemId === "RM2" && o.kind === "PURCHASE")!;
+    expect(rm2.supplierId).toBe("SUP-NORTH");
+    game = firmPlannedOrder(game, scenario, rm2.id, { supplierId: "SUP-CENTRAL" }, T, "Shorter lead time");
+    const firm = game.plannedOrders[0];
+    // Same receipt; Supplier Central needs 1 week instead of 2, so the order is released a week later.
+    expect(firm).toMatchObject({ supplierId: "SUP-CENTRAL", receiptPeriod: rm2.receiptPeriod, releasePeriod: rm2.receiptPeriod - 1, firm: true });
+    expect(game.decisions.at(-1)?.newValue).toMatchObject({ supplierId: "SUP-CENTRAL" });
+    expect(() => firmPlannedOrder(game, scenario, firm.id, { supplierId: "SUP-NOBODY" }, T)).toThrow(/supplierUnavailable/);
+  });
+
+  it("releases a planned purchase at the chosen supplier", () => {
+    let game = planned(newGame());
+    const rm4 = plannedOrdersDueForRelease(game).find((o) => o.itemId === "RM4")!;
+    expect(() => firmPlannedOrder(game, scenario, rm4.id, { supplierId: "SUP-NORTH" }, T)).toThrow(/supplierUnavailable/);
+    const rm1 = plannedOrdersDueForRelease(game).find((o) => o.itemId === "RM1")!;
+    game = releasePlannedOrder(game, scenario, rm1.id, T);
+    expect(game.releasedOrders.at(-1)).toMatchObject({ itemId: "RM1", supplierId: "SUP-NORTH", duePeriod: rm1.receiptPeriod });
+  });
+
   it("does not allow a firm order whose release would be in the past", () => {
     const game = planned(newGame());
     expect(() => firmPlannedOrder(game, scenario, "PL-A-3", { receiptPeriod: 1 }, T)).toThrow(/orders.releaseInPast/);

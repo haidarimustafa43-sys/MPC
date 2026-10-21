@@ -22,7 +22,6 @@ export function WorkflowActions({ compact = false }: { compact?: boolean }) {
   const simulateWeek = useGameStore((state) => state.simulateWeek);
   const reviewWeek = useGameStore((state) => state.reviewWeek);
   const startNextWeek = useGameStore((state) => state.startNextWeek);
-  const releaseAllDue = useGameStore((state) => state.releaseAllDue);
   if (!game) return null;
 
   const reason = (key?: string) => (key ? t(key) : undefined);
@@ -88,9 +87,10 @@ export function WorkflowActions({ compact = false }: { compact?: boolean }) {
         </button>
       )}
       {!compact && <StartWhatIfButton />}
+      {/* Orders are released on the Orders page, where the student sees each one. */}
       {!compact && dueForRelease > 0 && (
-        <button onClick={() => releaseAllDue()}>
-          {t("action.releaseAllDue")} ({dueForRelease})
+        <button onClick={() => navigate("/orders")}>
+          {t("action.goToDueOrders")} ({dueForRelease})
         </button>
       )}
       {!committed && (

@@ -56,6 +56,31 @@ describe("app flow", () => {
     expect(useGameStore.getState().saves).toHaveLength(1);
   });
 
+  it("changes planning parameters of any item in Master data", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByLabelText("Team name"), "Team Master");
+    await user.click(screen.getByRole("button", { name: "Start new game" }));
+    await startWeekAndAcknowledge(user);
+    await user.click(screen.getByRole("link", { name: "Master data" }));
+    await user.click(await screen.findByRole("tab", { name: "Planning parameters" }));
+
+    const rm4 = screen.getByLabelText("Safety stock RM4");
+    await user.clear(rm4);
+    await user.type(rm4, "80{Enter}");
+    expect(await screen.findByText("(scenario: 30)")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Supplier RM2"), "SUP-CENTRAL");
+
+    const params = useGameStore.getState().game!.planningParameters;
+    expect(params.RM4.safetyStock).toBe(80);
+    expect(params.RM2.supplierId).toBe("SUP-CENTRAL");
+    // The same values show in the form under the MRP record.
+    await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
+    await user.click(screen.getByRole("link", { name: "MRP" }));
+    await user.click(within(await screen.findByRole("tablist", { name: "Item" })).getByRole("tab", { name: "RM4" }));
+    expect(screen.getByRole("spinbutton", { name: "Safety stock" })).toHaveValue(80);
+  });
+
   it("shows an MRP record with an explanation of a calculated cell", async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -83,9 +108,17 @@ describe("app flow", () => {
     await user.click(screen.getByRole("link", { name: "Dashboard" }));
 
     await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
-    await user.click(await screen.findByRole("button", { name: /Release all due orders/ }));
+    // The dashboard sends the student to the orders instead of releasing them blindly.
+    expect(screen.queryByRole("button", { name: /Release all due orders/ })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Go to due orders (2)" }));
+    expect(await screen.findByRole("heading", { name: "Planned production" })).toBeInTheDocument();
+    const purchases = screen.getByRole("heading", { name: "Planned purchases" }).closest("section")!;
+    // Both due orders this week are purchases (RM1 and RM4); release them one by one.
+    for (const release of within(purchases).getAllByRole("button", { name: "Release" })) await user.click(release);
+    expect(screen.queryByRole("button", { name: "Release" })).not.toBeInTheDocument();
     await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
     await user.click(screen.getAllByRole("button", { name: "Commit plan" })[0]);
+    await user.click(screen.getByRole("link", { name: "Dashboard" }));
     await user.click((await screen.findAllByRole("button", { name: "Simulate week" }))[0]);
 
     await user.click((await screen.findAllByRole("button", { name: "Review period result" }))[0]);
@@ -111,9 +144,11 @@ describe("app flow", () => {
     await startWeekAndAcknowledge(user);
     await user.click(screen.getByRole("link", { name: "Dashboard" }));
     await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
+    await user.click(await screen.findByRole("button", { name: /Go to due orders/ }));
     await user.click(await screen.findByRole("button", { name: /Release all due orders/ }));
     await user.click(screen.getAllByRole("button", { name: "Run planning" })[0]);
     await user.click(screen.getAllByRole("button", { name: "Commit plan" })[0]);
+    await user.click(screen.getByRole("link", { name: "Dashboard" }));
     await user.click((await screen.findAllByRole("button", { name: "Simulate week" }))[0]);
     await user.click((await screen.findAllByRole("button", { name: "Review period result" }))[0]);
     await user.click(screen.getAllByRole("button", { name: "Start next week" })[0]);
