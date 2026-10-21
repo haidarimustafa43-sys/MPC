@@ -9,15 +9,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { TeamComparison } from "../components/instructor/TeamComparison";
 import type { GameState } from "../domain/gameState";
 import type { Scenario } from "../domain/scenario";
 import { parseGameFile } from "../importExport/validateSaveFile";
 import { summarizeGame, type GameSummary } from "../engine/scoring/gameSummary";
+import { analyzeTeam, type TeamAnalysis } from "../engine/scoring/teamAnalysis";
+import { teamComparisonCsv } from "../importExport/csv";
 import { isKnownScenario, loadScenario } from "../scenarios";
 import { useGameStore } from "../state/gameStore";
 import { useT } from "../state/selectors";
 import { describeDecision } from "../utils/describeDecision";
-import { readFileText } from "../utils/download";
+import { downloadText, readFileText } from "../utils/download";
 import { formatMoney, formatNumber, formatPercent } from "../utils/format";
 
 interface LoadedGame {
@@ -26,6 +29,7 @@ interface LoadedGame {
   game: GameState;
   scenario?: Scenario;
   summary: GameSummary;
+  analysis: TeamAnalysis;
   currency: string;
 }
 
@@ -72,6 +76,7 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
         game: result.value.gameState,
         scenario,
         summary: summarizeGame(result.value.gameState, scenario?.settings.scoring),
+        analysis: analyzeTeam(result.value.gameState),
         currency: scenario?.settings.currency ?? "",
       });
     }
@@ -126,7 +131,12 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
       {games.length > 0 && (
         <>
           <section className="card">
-            <h2>{t("instructor.overview")}</h2>
+            <div className="card-header">
+              <h2>{t("instructor.overview")}</h2>
+              <button onClick={() => downloadText("team-comparison.csv", teamComparisonCsv(games), "text/csv")}>
+                {t("analysis.exportCsv")}
+              </button>
+            </div>
             <p className="muted small">{t("instructor.noRanking")}</p>
             <div className="table-scroll">
               <table className="data">
@@ -245,6 +255,8 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
             </div>
           </section>
 
+          <TeamComparison teams={games} />
+
           {detail && (
             <section className="card">
               <h2>
@@ -310,6 +322,58 @@ export function InstructorReviewPage({ onBack }: { onBack: () => void }) {
                       </li>
                     ))}
                   </ul>
+                </div>
+              </div>
+              <div className="grid cols-2" style={{ marginTop: "1rem" }}>
+                <div>
+                  <h3>{t("analysis.eventReactions")}</h3>
+                  <p className="muted small">{t("analysis.eventReactionsHelp")}</p>
+                  <ul className="small">
+                    {detail.analysis.eventReactions.map((reaction) => (
+                      <li key={`${reaction.eventId}-${reaction.period}`}>
+                        <strong>
+                          {t("review.week")} {reaction.period}: {reaction.eventId}
+                          {reaction.choiceId ? ` → ${reaction.choiceId}` : ""}
+                        </strong>
+                        {": "}
+                        {Object.keys(reaction.decisions).length === 0
+                          ? t("analysis.noReaction")
+                          : Object.entries(reaction.decisions)
+                              .map(([category, n]) => `${t(`decisionCategory.${category}`)} ×${n}`)
+                              .join(", ")}
+                        {reaction.releases > 0 && ` · ${t("analysis.releasesCount", { count: reaction.releases })}`}
+                      </li>
+                    ))}
+                  </ul>
+                  <h3>{t("analysis.whatIfConclusions")}</h3>
+                  {detail.analysis.process.whatIfConclusions.length === 0 ? (
+                    <p className="muted small">{t("analysis.noConclusions", { count: detail.analysis.process.whatIfCount })}</p>
+                  ) : (
+                    <ul className="small">
+                      {detail.analysis.process.whatIfConclusions.map((conclusion, index) => (
+                        <li key={index}>
+                          {t("review.week")} {conclusion.period}: “{conclusion.text}”
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div>
+                  <h3>{t("analysis.failureList")}</h3>
+                  {detail.analysis.failures.list.length === 0 ? (
+                    <p className="muted small">{t("analysis.noFailures")}</p>
+                  ) : (
+                    <ul className="small">
+                      {detail.analysis.failures.list.map((failure, index) => (
+                        <li key={index}>
+                          {t("review.week")} {failure.period}: {t(`review.failure.${failure.kind}`)} – {failure.description}{" "}
+                          <span className={`badge ${failure.cause === "UNRESOLVED_PLAN_PROBLEM" ? "warning" : "info"}`}>
+                            {t(failure.cause === "UNRESOLVED_PLAN_PROBLEM" ? "analysis.known" : "analysis.unplanned")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             </section>

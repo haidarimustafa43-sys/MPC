@@ -1,4 +1,7 @@
 import type { GameState } from "../domain/gameState";
+import type { GameSummary } from "../engine/scoring/gameSummary";
+import type { TeamAnalysis } from "../engine/scoring/teamAnalysis";
+import { COST_KEYS, FAILURE_KINDS } from "../engine/scoring/teamAnalysis";
 
 type Cell = string | number | boolean | null | undefined;
 
@@ -79,6 +82,67 @@ export const inventoryHistoryCsv = (game: GameState): string =>
       result.endInventory.map((b) => [result.period, b.itemId, b.warehouseId, b.quantityOnHand]),
     ),
   );
+
+/** One row per team with every figure of the instructor review, for a spreadsheet. */
+export const teamComparisonCsv = (teams: readonly { summary: GameSummary; analysis: TeamAnalysis }[]): string => {
+  const components = teams[0]?.summary.score.components.map((c) => c.key) ?? [];
+  return toCsv(
+    [
+      "team",
+      "scenario",
+      "weeksSimulated",
+      "completed",
+      "serviceLevel",
+      "netContribution",
+      "revenue",
+      ...COST_KEYS,
+      "lateCustomerOrders",
+      ...components.map((key) => `score_${key}`),
+      "scoreTotal",
+      ...FAILURE_KINDS.map((kind) => `failures_${kind}`),
+      "failuresKnownInPlan",
+      "failuresUnplanned",
+      "decisions",
+      "decisionsWithReasonShare",
+      "planningRuns",
+      "planningRunsPerWeek",
+      "whatIfs",
+      "orderMoves",
+      "supplierChanges",
+      "parameterChanges",
+      "capacityDecisions",
+      "orderReleases",
+      "whatIfConclusions",
+    ],
+    teams.map(({ summary, analysis }) => [
+      summary.teamName,
+      `${summary.scenarioId} v${summary.scenarioVersion}`,
+      summary.weeksSimulated,
+      summary.completed,
+      Math.round(summary.totals.serviceLevel * 1000) / 1000,
+      Math.round(summary.totals.netContribution),
+      Math.round(summary.totals.revenue),
+      ...COST_KEYS.map((key) => Math.round(analysis.costs[key])),
+      summary.totals.lateCustomerOrders,
+      ...summary.score.components.map((c) => Math.round(c.points * 10) / 10),
+      Math.round(summary.score.total * 10) / 10,
+      ...FAILURE_KINDS.map((kind) => analysis.failures.byKind[kind]),
+      analysis.failures.known,
+      analysis.failures.unplanned,
+      analysis.process.decisions,
+      Math.round(analysis.process.reasonShare * 100) / 100,
+      analysis.process.planningRuns,
+      Math.round(analysis.process.runsPerWeek * 10) / 10,
+      analysis.process.whatIfCount,
+      analysis.process.orderMoves,
+      analysis.process.supplierChanges,
+      analysis.process.parameterChanges,
+      analysis.process.capacityDecisions,
+      analysis.process.releases,
+      analysis.process.whatIfConclusions.map((c) => `w${c.period}: ${c.text}`).join(" | "),
+    ]),
+  );
+};
 
 export const historiesJson = (game: GameState): string =>
   JSON.stringify(

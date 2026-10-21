@@ -277,18 +277,21 @@ export const setCapacityAdjustment = (
     return game;
   }
   const others = game.workCenterCapacity.filter((entry) => entry !== existing);
-  return recordDecision(
+  // One logged decision per field that actually changed.
+  const fields = (["overtimeHours", "externalHours"] as const).filter((field) => updated[field] !== previous[field]);
+  return fields.reduce(
+    (state, field) =>
+      recordDecision(state, {
+        timestamp: now,
+        category: field === "externalHours" ? "EXTERNAL_CAPACITY" : "OVERTIME",
+        entityType: "WORK_CENTER",
+        entityId: `${workCenterId}@${period}`,
+        field,
+        previousValue: previous[field],
+        newValue: updated[field],
+        reason,
+      }),
     { ...game, workCenterCapacity: [...others, updated] },
-    {
-      timestamp: now,
-      category: patch.externalHours !== undefined ? "EXTERNAL_CAPACITY" : "OVERTIME",
-      entityType: "WORK_CENTER",
-      entityId: `${workCenterId}@${period}`,
-      field: patch.externalHours !== undefined ? "externalHours" : "overtimeHours",
-      previousValue: patch.externalHours !== undefined ? previous.externalHours : previous.overtimeHours,
-      newValue: patch.externalHours !== undefined ? updated.externalHours : updated.overtimeHours,
-      reason,
-    },
   );
 };
 
