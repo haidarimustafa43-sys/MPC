@@ -7,6 +7,8 @@ import { useGameStore } from "../../state/gameStore";
 import { useT } from "../../state/selectors";
 import type { TimePhasedRow } from "../tables/TimePhasedTable";
 import { TimePhasedTable } from "../tables/TimePhasedTable";
+import { whereUsedText } from "../../utils/bom";
+import { BomLinksPanel } from "./BomLinksPanel";
 import { ExplanationPanel } from "./ExplanationPanel";
 import { PlanningParametersForm } from "./PlanningParametersForm";
 
@@ -37,7 +39,12 @@ export function ItemPlanView({
   const [selected, setSelected] = useState<{ row: string; period: number; label: string } | null>(null);
   const uncovered = new Set(record.uncoveredPeriods);
   const firm = new Set(record.firmPeriods ?? []);
-  const pabTooltip = (index: number) => t(`risk.${record.risk[index]}`);
+  const usedIn = scenario ? whereUsedText(scenario.bom, record.itemId) : "";
+  // A shortage also says who suffers from it, so the student knows where to look next.
+  const pabTooltip = (index: number) =>
+    record.risk[index] === "SHORTAGE" && usedIn
+      ? `${t("risk.SHORTAGE")} · ${t("bom.usedInTooltip", { path: usedIn })}`
+      : t(`risk.${record.risk[index]}`);
 
   const common: TimePhasedRow[] = [
     {
@@ -198,6 +205,7 @@ export function ItemPlanView({
           onClose={() => setSelected(null)}
         />
       )}
+      {selected && <BomLinksPanel record={record} period={selected.period} />}
       <PlanningParametersForm itemId={record.itemId} />
     </div>
   );

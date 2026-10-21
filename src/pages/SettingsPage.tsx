@@ -9,6 +9,8 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const language = useGameStore((state) => state.language);
   const setLanguage = useGameStore((state) => state.setLanguage);
+  const showTips = useGameStore((state) => state.showTips);
+  const setShowTips = useGameStore((state) => state.setShowTips);
   const game = useGameStore((state) => state.game);
   const newGame = useGameStore((state) => state.newGame);
   const closeGame = useGameStore((state) => state.closeGame);
@@ -26,6 +28,11 @@ export function SettingsPage() {
             <option value="sv">Svenska</option>
           </select>
         </label>
+        <label className="row" style={{ marginTop: "0.75rem" }}>
+          <input type="checkbox" checked={showTips} onChange={(event) => setShowTips(event.target.checked)} />
+          {t("settings.tips")}
+        </label>
+        <p className="muted small">{t("settings.tipsHelp")}</p>
       </section>
       <section className="card">
         <h2>{t("settings.game")}</h2>

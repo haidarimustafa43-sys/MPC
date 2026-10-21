@@ -5,7 +5,7 @@ import type { Language } from "../domain/common";
  * throws in some private-browsing modes; the app must work without it.
  */
 
-const KEYS = { language: "mpc.language", activeGameId: "mpc.activeGameId" } as const;
+const KEYS = { language: "mpc.language", activeGameId: "mpc.activeGameId", showTips: "mpc.showTips" } as const;
 
 const read = (key: string): string | null => {
   try {
@@ -26,5 +26,8 @@ const write = (key: string, value: string | null): void => {
 
 export const getStoredLanguage = (): Language => (read(KEYS.language) === "sv" ? "sv" : "en");
 export const setStoredLanguage = (language: Language): void => write(KEYS.language, language);
+/** Tips are on unless the student turned them off. */
+export const getStoredShowTips = (): boolean => read(KEYS.showTips) !== "false";
+export const setStoredShowTips = (show: boolean): void => write(KEYS.showTips, show ? null : "false");
 export const getActiveGameId = (): string | null => read(KEYS.activeGameId);
 export const setActiveGameId = (id: string | null): void => write(KEYS.activeGameId, id);

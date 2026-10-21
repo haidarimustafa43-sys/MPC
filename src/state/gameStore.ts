@@ -26,7 +26,7 @@ import {
 } from "../engine/game/orderActions";
 import { InvalidTransitionError } from "../engine/game/stateMachine";
 import { reviewPeriod, simulatePeriod, startNextPeriod } from "../engine/game/weekFlow";
-import { applyWhatIf, discardWhatIf, startWhatIf } from "../engine/game/whatIf";
+import { discardWhatIf, startWhatIf } from "../engine/game/whatIf";
 import { translate } from "../i18n";
 import {
   isBuiltInScenario,
@@ -49,7 +49,14 @@ import {
   saveGame,
   type SaveSummary,
 } from "../storage/saveRepository";
-import { getActiveGameId, getStoredLanguage, setActiveGameId, setStoredLanguage } from "../storage/settings";
+import {
+  getActiveGameId,
+  getStoredLanguage,
+  getStoredShowTips,
+  setActiveGameId,
+  setStoredLanguage,
+  setStoredShowTips,
+} from "../storage/settings";
 import { generateId } from "../utils/format";
 import { newSeed } from "../utils/random";
 
@@ -58,6 +65,7 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
 interface GameStoreState {
   initialized: boolean;
   language: Language;
+  showTips: boolean;
   scenario: Scenario | null;
   game: GameState | null;
   /** The live game while a what-if branch is open in `game`. */
@@ -81,6 +89,7 @@ interface GameStoreActions {
   duplicateSave: (id: string) => Promise<void>;
   deleteSave: (id: string) => Promise<void>;
   setLanguage: (language: Language) => void;
+  setShowTips: (show: boolean) => void;
   clearError: () => void;
   startWeek: () => void;
   updateParameters: (itemId: string, patch: Partial<ItemPlanningParameters>, reason?: string) => void;
@@ -116,7 +125,6 @@ interface GameStoreActions {
   importScenarioFile: (text: string) => Promise<boolean>;
   removeCustomScenario: (id: string) => Promise<void>;
   clearNotice: () => void;
-  applyWhatIf: (reason?: string) => void;
   discardWhatIf: (reason?: string) => void;
 }
 
@@ -172,6 +180,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
   return {
     initialized: false,
     language: "en",
+    showTips: getStoredShowTips(),
     scenario: null,
     game: null,
     liveGame: null,
@@ -254,6 +263,10 @@ export const useGameStore = create<GameStore>()((set, get) => {
     setLanguage: (language) => {
       setStoredLanguage(language);
       set({ language });
+    },
+    setShowTips: (show) => {
+      setStoredShowTips(show);
+      set({ showTips: show });
     },
 
     clearError: () => set({ error: null }),
@@ -366,17 +379,7 @@ export const useGameStore = create<GameStore>()((set, get) => {
         set({ error: describeError(error, language) });
       }
     },
-    applyWhatIf: (reason) => {
-      const { game, liveGame, language } = get();
-      if (!game || !liveGame) return;
-      try {
-        const applied = applyWhatIf(liveGame, game, now(), reason);
-        set({ game: applied, liveGame: null, error: null });
-        scheduleSave(applied);
-      } catch (error) {
-        set({ error: describeError(error, language) });
-      }
-    },
+    // A what-if is never applied: the student carries over what they learnt by hand.
     discardWhatIf: (reason) => {
       const { game, liveGame } = get();
       if (!game || !liveGame) return;

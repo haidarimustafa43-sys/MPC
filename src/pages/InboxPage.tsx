@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { TipsPanel } from "../components/common/TipsPanel";
 import { SeverityBadge } from "../components/common/SeverityBadge";
 import { MessageView } from "../components/inbox/MessageView";
 import { localize } from "../i18n";
@@ -22,6 +23,7 @@ export function InboxPage() {
   return (
     <>
       <h1>{t("inbox.title")}</h1>
+      <TipsPanel page="inbox" limit={3} />
       {messages.length === 0 ? (
         <p className="muted">{t("inbox.empty")}</p>
       ) : (

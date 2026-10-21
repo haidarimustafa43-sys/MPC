@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom";
 import { KpiCard } from "../components/common/KpiCard";
+import { TipsPanel } from "../components/common/TipsPanel";
 import { ViolationList } from "../components/common/ViolationList";
 import { WorkflowActions } from "../components/common/WorkflowActions";
 import { cumulativeServiceLevel } from "../engine/events/evaluateEventTriggers";
 import { latestVersion } from "../engine/game/gameActions";
+import { plannedOrdersDueForRelease } from "../engine/game/orderActions";
 import { useGameStore } from "../state/gameStore";
 import { currentViolations, useT } from "../state/selectors";
 import { describeDecision } from "../utils/describeDecision";
 import { formatHours, formatMoney, formatPercent } from "../utils/format";
 
-const nextStepKey = (status: string, stale: boolean, hasVersion: boolean): string => {
+const nextStepKey = (status: string, stale: boolean, hasVersion: boolean, dueLeft: number): string => {
   switch (status) {
     case "PERIOD_START":
       return "next.startWeek";
@@ -22,7 +24,8 @@ const nextStepKey = (status: string, stale: boolean, hasVersion: boolean): strin
     case "GAME_COMPLETED":
       return "next.completed";
   }
-  if (status === "PLAN_COMMITTED" && !stale) return "next.simulateNow";
+  // Orders are normally released before committing; only remind when some were left.
+  if (status === "PLAN_COMMITTED" && !stale) return dueLeft > 0 ? "next.simulateDueLeft" : "next.simulateNow";
   if (stale && hasVersion) return "next.rerun";
   if (hasVersion) return "next.commit";
   return "next.runPlanning";
@@ -35,6 +38,7 @@ export function DashboardPage() {
   const language = useGameStore((state) => state.language);
   if (!game || !scenario) return null;
   const version = latestVersion(game);
+  const dueLeft = version ? plannedOrdersDueForRelease(game).length : 0;
   const kpis = version?.projectedKpis;
   const currency = scenario.settings.currency;
   const violations = currentViolations(game, scenario.settings.frozenZonePeriods).filter(
@@ -60,8 +64,9 @@ export function DashboardPage() {
         </div>
         <p>
           <strong>{t("next.title")}:</strong>{" "}
-          {t(nextStepKey(game.gameStatus, game.pendingDecisionIds.length > 0, !!version), {
+          {t(nextStepKey(game.gameStatus, game.pendingDecisionIds.length > 0, !!version, dueLeft), {
             period: game.currentPeriod,
+            count: dueLeft,
           })}
         </p>
         <WorkflowActions />
@@ -120,6 +125,8 @@ export function DashboardPage() {
       ) : (
         <div className="banner info">{t("dashboard.noPlan")}</div>
       )}
+
+      <TipsPanel page="dashboard" />
 
       <div className="grid cols-2">
         <section className="card">

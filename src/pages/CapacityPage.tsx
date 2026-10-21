@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TipsPanel } from "../components/common/TipsPanel";
 import { CapacityChart } from "../components/charts/CapacityChart";
 import { CommitNumberInput } from "../components/common/CommitNumberInput";
 import { PlanStatusBanner } from "../components/common/PlanStatusBanner";
@@ -31,6 +32,7 @@ export function CapacityPage() {
   return (
     <>
       <h1>{t("nav.capacity")}</h1>
+      <TipsPanel page="capacity" limit={3} />
       <PlanStatusBanner />
       <ItemTabs
         label={t("capacity.workCenter")}

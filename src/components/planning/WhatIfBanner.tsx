@@ -2,18 +2,20 @@ import { useState } from "react";
 import { latestVersion } from "../../engine/game/gameActions";
 import { useGameStore } from "../../state/gameStore";
 import { useT } from "../../state/selectors";
+import { describeDecision } from "../../utils/describeDecision";
 import { VersionComparison } from "./VersionComparison";
 
 /**
  * Shown on every page while a what-if branch is open: what is different from
- * the live plan, and the explicit choice to apply or discard the branch.
+ * the live plan, and the way back. A what-if is only a test: nothing in it
+ * reaches the live plan, so the student has to carry over what they learnt.
  */
 export function WhatIfBanner() {
   const t = useT();
   const game = useGameStore((state) => state.game);
   const liveGame = useGameStore((state) => state.liveGame);
   const scenario = useGameStore((state) => state.scenario);
-  const applyWhatIf = useGameStore((state) => state.applyWhatIf);
+  const language = useGameStore((state) => state.language);
   const discardWhatIf = useGameStore((state) => state.discardWhatIf);
   const runPlanning = useGameStore((state) => state.runPlanning);
   const [reason, setReason] = useState("");
@@ -22,7 +24,8 @@ export function WhatIfBanner() {
 
   const base = latestVersion(liveGame);
   const current = latestVersion(game);
-  const branchChanges = game.decisions.length - liveGame.decisions.length;
+  const branchDecisions = game.decisions.slice(liveGame.decisions.length);
+  const branchChanges = branchDecisions.length;
   const branchVersions = game.planningVersions.length - liveGame.planningVersions.length;
   const stale = game.pendingDecisionIds.length > 0;
 
@@ -62,16 +65,28 @@ export function WhatIfBanner() {
           )}
         </>
       )}
+      {branchChanges > 0 && (
+        <div style={{ marginTop: "0.75rem" }}>
+          <p className="small">{t("whatIf.yourChanges")}</p>
+          <ul className="small">
+            {branchDecisions.map((decision) => {
+              const text = describeDecision(decision, t, scenario, language);
+              return (
+                <li key={decision.id}>
+                  {text.category} · {text.object}: {text.change}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       <div className="form-row" style={{ marginTop: "0.75rem" }}>
         <label className="field" style={{ flex: 1, minWidth: 220 }}>
-          {t("plan.reason")}
+          {t("whatIf.conclusion")}
           <input type="text" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
         </label>
-        <button className="primary" onClick={() => applyWhatIf(reason.trim() || undefined)}>
-          {t("whatIf.apply")}
-        </button>
-        <button className="danger" onClick={() => discardWhatIf(reason.trim() || undefined)}>
-          {t("whatIf.discard")}
+        <button className="primary" onClick={() => discardWhatIf(reason.trim() || undefined)}>
+          {t("whatIf.end")}
         </button>
       </div>
     </section>

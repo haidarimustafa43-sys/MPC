@@ -97,6 +97,10 @@ describe("app flow", () => {
     const netCell = screen.getByRole("button", { name: /Net requirements, Period 3: 210/ });
     await user.click(netCell);
     expect(await screen.findByRole("heading", { name: "Calculation: Net requirements, period 3" })).toBeInTheDocument();
+    // The item's place in the bill of materials is shown next to the calculation.
+    const links = screen.getByRole("region", { name: "BOM links" });
+    expect(within(links).getByText("Used in (up to the end products)")).toBeInTheDocument();
+    expect(within(links).getByText(/Needed in period 3 by these parent orders/)).toBeInTheDocument();
   });
 
   it("simulates a week, shows the result and opens the next decision request as a dialog", async () => {
@@ -168,12 +172,15 @@ describe("app flow", () => {
     expect(screen.queryByRole("button", { name: "Review planning before deciding" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Accept" }));
     expect(await screen.findByText(/Answered in the what-if plan: Accept/)).toBeInTheDocument();
+    // There is no way to carry the branch over; the student redoes the decision in the live plan.
+    expect(screen.queryByRole("button", { name: /Apply/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/Your changes in this what-if/)).toBeInTheDocument();
 
     const banner = screen.getByRole("region", { name: "WHAT-IF PLAN" });
     await user.click(within(banner).getByRole("button", { name: "Run planning" }));
     expect(await within(banner).findByRole("button", { name: /Hide comparison PV-2-1 → PV-2-2/ })).toBeInTheDocument();
 
-    await user.click(within(banner).getByRole("button", { name: "Discard what-if" }));
+    await user.click(within(banner).getByRole("button", { name: "End what-if and return to the live plan" }));
     await waitFor(() => expect(useGameStore.getState().game?.whatIf).toBeUndefined());
     const live = useGameStore.getState().game!;
     expect(live.customerOrders.find((o) => o.id === "CO-1005")?.quantity).toBe(150);
@@ -195,7 +202,7 @@ describe("app flow", () => {
     expect(screen.getAllByText("WHAT-IF PLAN").length).toBeGreaterThan(0);
     const commit = screen.getAllByRole("button", { name: "Commit plan" })[0];
     expect(commit).toBeDisabled();
-    expect(screen.getByText(/Make a change, for example overtime/)).toBeInTheDocument();
+    expect(screen.getByText(/Make a change, for example a customer order request/)).toBeInTheDocument();
 
     // Change something in the branch and replan there.
     await user.click(screen.getByRole("link", { name: "Capacity" }));
@@ -206,9 +213,9 @@ describe("app flow", () => {
     const banner = screen.getByRole("region", { name: "WHAT-IF PLAN" });
     await user.click(within(banner).getByRole("button", { name: "Run planning" }));
     expect(await screen.findByText(/Overload WC200: 1.0 h → 0.0 h/)).toBeInTheDocument();
-    expect(screen.queryByText(/Make a change, for example overtime/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Make a change, for example a customer order request/)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Discard what-if" }));
+    await user.click(screen.getByRole("button", { name: "End what-if and return to the live plan" }));
     await waitFor(() => expect(screen.queryByText("You are exploring a what-if plan")).not.toBeInTheDocument());
     const live = useGameStore.getState().game!;
     expect(live.whatIf).toBeUndefined();

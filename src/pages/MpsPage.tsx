@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TipsPanel } from "../components/common/TipsPanel";
 import { PlanStatusBanner } from "../components/common/PlanStatusBanner";
 import { ItemPlanView } from "../components/planning/ItemPlanView";
 import { ItemTabs } from "../components/planning/ItemTabs";
@@ -19,6 +20,7 @@ export function MpsPage() {
   return (
     <>
       <h1>{t("nav.mps")}</h1>
+      <TipsPanel page="mps" limit={3} />
       <PlanStatusBanner />
       {records.length > 0 && record && item && (
         <>

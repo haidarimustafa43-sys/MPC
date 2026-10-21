@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TipsPanel } from "../components/common/TipsPanel";
 import { PlanStatusBanner } from "../components/common/PlanStatusBanner";
 import { ItemTabs } from "../components/planning/ItemTabs";
 import type { ProductionOrder, PurchaseOrder } from "../domain/order";
@@ -265,6 +266,7 @@ export function OrdersPage() {
   return (
     <>
       <h1>{t("nav.orders")}</h1>
+      <TipsPanel page="orders" limit={3} />
       <ItemTabs
         label={t("nav.orders")}
         items={[
